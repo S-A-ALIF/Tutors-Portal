@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* You can define your custom fonts right here in v4 */
+@theme {
+  --font-sans: "DM Sans", sans-serif;
+  --font-serif: "Playfair Display", serif;
+}
