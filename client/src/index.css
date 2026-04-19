@@ -1,7 +1,35 @@
 @import "tailwindcss";
 
-/* You can define your custom fonts right here in v4 */
 @theme {
-  --font-sans: "DM Sans", sans-serif;
   --font-serif: "Playfair Display", serif;
+  --font-sans: "DM Sans", sans-serif;
+}
+
+/* Custom global styles to match your original dashboard aesthetic */
+:root {
+  --bg: #f7f7fb;
+}
+
+body {
+  background-color: var(--bg);
+  @apply font-sans text-[#1a1a2e];
+}
+
+/* Stat card specific decorative b@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=DM+Sans:wght@300;400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background-color: #f7f7fb;
+    color: #1a1a2e;
+    min-height: 100vh;
+  }
+}order */
+.stat-card::before {
+  content: '';
+  @apply absolute top-0 left-0 right-0 h-[3px] rounded-t-xl;
 }
