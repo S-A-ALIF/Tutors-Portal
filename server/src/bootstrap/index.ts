@@ -1,7 +1,9 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
-import { config } from '../config/env.config';
+import { envConfig } from '../config/env.config';
 import { pool } from '../config/db.config';
+import rootRouter from '../routes';
+import { errorHandler } from '../middlewares/errorMiddleware';
 
 const app: Application = express();
 
@@ -13,7 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 // Basic Health Check Route
 app.get('/health', async (req: Request, res: Response) => {
     try {
-        // Run a simple query to verify the Neon DB connection is active
+        // Run a simple query to verify the connection
         const result = await pool.query('SELECT NOW()');
         
         res.status(200).json({
@@ -31,10 +33,33 @@ app.get('/health', async (req: Request, res: Response) => {
     }
 });
 
-// Start the Server
-const PORT = config.port;
+app.use('/api/v1', rootRouter);
+app.use(errorHandler);
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log(`Environment: ${config.nodeEnv}`);
+// Start the Server
+const PORT = envConfig.port;
+
+const server = app.listen(PORT, () => {
+    console.log(`🚀 Server is running on port ${PORT}`);
+    console.log(`Environment: ${envConfig.env}`);
 });
+
+// Graceful Shutdown - Optional but recommended for production data integrity
+const shutdown = async (signal: string) => {
+    console.log(`\n🛑 ${signal} received. Closing server...`);
+    server.close(async () => {
+        try {
+            await pool.end();
+            console.log('✅ Database connections drained.');
+            process.exit(0);
+        } catch (err) {
+            console.error('❌ Error during database pool shutdown:', err);
+            process.exit(1);
+        }
+    });
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+export default app;
