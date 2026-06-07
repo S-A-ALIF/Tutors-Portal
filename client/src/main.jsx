@@ -1,21 +1,20 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { AuthProvider } from "./context/AuthContext";
 import { RouterProvider } from "react-router-dom";
+import router from "./router/router";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-
-import router from "./router/router";
 import { queryClient } from "./services/queryClient";
-import "./index.css"; // Ensure Tailwind 4 is imported here
+import "./index.css";
 
-createRoot(document.getElementById("root")).render(
-    <StrictMode>
-        {/* Provides server-state management to the entire app */}
-        <QueryClientProvider client={queryClient}>
-            <RouterProvider router={router} />
-            
-            {/* Development tool for debugging API queries */}
-            <ReactQueryDevtools initialIsOpen={false} />
-        </QueryClientProvider>
-    </StrictMode>
+ReactDOM.createRoot(document.getElementById("root")).render(
+    <React.StrictMode>
+        <AuthProvider>
+            <QueryClientProvider client={queryClient}>
+                <RouterProvider router={router} />
+                <ReactQueryDevtools initialIsOpen={false} />
+            </QueryClientProvider>
+        </AuthProvider>
+    </React.StrictMode>
 );

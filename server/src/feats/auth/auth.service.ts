@@ -1,26 +1,33 @@
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { pool } from '../../config/db.config';
 import { CustomError } from '../../error/customErrors';
 import { generateToken } from '../../config/jwt.config';
 
 export const registerUser = async (userData: any) => {
-    const { name, email, password, role } = userData;
+    const { email, password, role } = userData;
 
     try {
+        // 1. Check if user already exists
         const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
         
         if (existingUser.rows.length > 0) {
             throw new CustomError('User with this email already exists', 409);
         }
 
+        // 2. Hash the password
         const hashedPassword = await bcrypt.hash(password, 12);
 
+        // 3. Generate UUID for the id (Primary Key)
+        const id = crypto.randomUUID();
+
+        // 4. Insert user
         const query = `
-            INSERT INTO users (name, email, password, role) 
+            INSERT INTO users (id, email, password, role) 
             VALUES ($1, $2, $3, $4) 
-            RETURNING id, name, email, role
+            RETURNING id, email, role
         `;
-        const result = await pool.query(query, [name, email, hashedPassword, role]);
+        const result = await pool.query(query, [id, email, hashedPassword, role || 'student']);
 
         return result.rows[0];
     } catch (error: any) {
@@ -55,16 +62,13 @@ export const loginUser = async (email: string, password: string) => {
             token,
             user: {
                 id: user.id,
-                name: user.name,
                 email: user.email,
                 role: user.role
             }
         };
     } catch (error: any) {
-        // If it is our CustomError, rethrow it to the controller
         if (error instanceof CustomError) throw error;
         
-        // If it is a new/unexpected error, log it and throw a 500
         console.error('Service Error [loginUser]:', error);
         throw new CustomError('Database operation failed during login', 500);
     }

@@ -8,14 +8,20 @@ import { errorHandler } from '../middlewares/errorMiddleware';
 const app: Application = express();
 
 // Global Middleware
-app.use(cors());
+// CRITICAL: You must allow credentials (cookies/sessions) from your frontend origin
+app.use(cors({
+    origin: ["http://localhost:5173", "http://localhost:3000"], // Adjust to your frontend port
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Basic Health Check Route
 app.get('/health', async (req: Request, res: Response) => {
     try {
-        // Run a simple query to verify the connection
         const result = await pool.query('SELECT NOW()');
         
         res.status(200).json({
@@ -37,14 +43,14 @@ app.use('/api/v1', rootRouter);
 app.use(errorHandler);
 
 // Start the Server
-const PORT = envConfig.port;
+const PORT = envConfig.port || 5000;
 
 const server = app.listen(PORT, () => {
     console.log(`🚀 Server is running on port ${PORT}`);
     console.log(`Environment: ${envConfig.env}`);
 });
 
-// Graceful Shutdown - Optional but recommended for production data integrity
+// Graceful Shutdown
 const shutdown = async (signal: string) => {
     console.log(`\n🛑 ${signal} received. Closing server...`);
     server.close(async () => {

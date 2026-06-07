@@ -1,24 +1,37 @@
 import { createBrowserRouter } from "react-router-dom";
 import App from "../App";
 import Dashboard from "../pages/Dashboard";
-// Import other pages as you create them, e.g.:
-// import StudentsPage from "../pages/StudentsPage"; 
+import LoginPage from "../pages/authentication/LoginPage";
+import SignupPage from "../pages/authentication/SignupPage";
+import ProtectedRoute from "../components/auth/ProtectedRoute";
 
 const router = createBrowserRouter([
     {
         path: "/",
-        element: <App />, // Root element with Toaster and Outlet
+        element: <App />,
         children: [
             {
-                index: true, // This makes Dashboard the default view at "/"
-                element: <Dashboard />,
+                index: true,
+                element: <LoginPage />,
             },
-            /* Future routes follow this pattern:
             {
-                path: "students",
-                element: <StudentsPage />,
+                path: "login",
+                element: <LoginPage />,
             },
-            */
+            {
+                path: "signup",
+                element: <SignupPage />,
+            },
+            {
+                path: "dashboard",
+                element: <ProtectedRoute />,
+                children: [
+                    {
+                        index: true,
+                        element: <Dashboard />,
+                    },
+                ],
+            },
         ],
     },
 ]);
