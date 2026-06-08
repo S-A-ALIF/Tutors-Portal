@@ -10,7 +10,6 @@ export const AuthProvider = ({ children }) => {
     const signup = async (userData) => {
         setLoading(true);
         try {
-            // This calls the authService we verified earlier
             const response = await authService.register(userData);
             return response;
         } catch (error) {
@@ -24,8 +23,19 @@ export const AuthProvider = ({ children }) => {
         setLoading(true);
         try {
             const userData = await authService.login(credentials);
-            setUser(userData);
+            
+            // DEBUG: Check what the service is actually returning
+            console.log("DEBUG: Data received from authService.login:", userData);
+            
+            if (userData) {
+                setUser(userData);
+            } else {
+                console.error("DEBUG: authService.login returned undefined or null");
+            }
+            
+            return userData;
         } catch (error) {
+            console.error("DEBUG: Login request error:", error);
             throw error;
         } finally {
             setLoading(false);

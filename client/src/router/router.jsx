@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 import App from "../App";
 import Dashboard from "../pages/Dashboard";
+import StudentDashboard from "../pages/StudentDashboard";
 import LoginPage from "../pages/authentication/LoginPage";
 import SignupPage from "../pages/authentication/SignupPage";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
@@ -29,6 +30,16 @@ const router = createBrowserRouter([
                     {
                         index: true,
                         element: <Dashboard />,
+                    },
+                ],
+            },
+            {
+                path: "student-dashboard",
+                element: <ProtectedRoute />,
+                children: [
+                    {
+                        index: true,
+                        element: <StudentDashboard />,
                     },
                 ],
             },
