@@ -1,5 +1,4 @@
 import React from "react";
-import AppContainer from "../components/layouts/AppContainer";
 import DashboardHeader from "../features/dashboard/components/DashboardHeader";
 import QuickActionsSection from "../features/dashboard/components/QuickActionsSection";
 import StatsSection from "../features/dashboard/components/StatsSection";
@@ -10,23 +9,23 @@ import ExamResultsWidget from "../features/dashboard/components/ExamResultsWidge
 
 const Dashboard = () => {
   return (
-    <AppContainer>
+    <>
       <DashboardHeader />
       <QuickActionsSection />
       <StatsSection />
 
-      {/* Grid Row 1 (Matches original .grid-2) */}
+      {/* Grid Row 1 */}
       <div className="grid grid-cols-[1.4fr_1fr] gap-[14px] mb-[14px]">
         <RecentFeesSection />
         <ScheduleTimeline />
       </div>
 
-      {/* Grid Row 2 (Matches original .grid-2) */}
+      {/* Grid Row 2 */}
       <div className="grid grid-cols-[1.4fr_1fr] gap-[14px]">
         <FeeChartWidget />
         <ExamResultsWidget />
       </div>
-    </AppContainer>
+    </>
   );
 };
 

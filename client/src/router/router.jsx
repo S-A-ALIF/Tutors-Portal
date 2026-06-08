@@ -1,50 +1,42 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import App from "../App";
-import Dashboard from "../pages/Dashboard";
-import StudentDashboard from "../pages/StudentDashboard";
-import LoginPage from "../pages/authentication/LoginPage";
-import SignupPage from "../pages/authentication/SignupPage";
+import Layout from "../components/layouts/Layout";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
+import { pages } from "../pages";
+
+// Filter pages for cleaner routing logic
+const protectedPages = pages.filter((p) => p.isProtected);
+const publicPages = pages.filter((p) => !p.isProtected);
 
 const router = createBrowserRouter([
-    {
-        path: "/",
-        element: <App />,
+  {
+    path: "/",
+    element: <App />,
+    children: [
+      // Map public pages
+      ...publicPages.map((page) => ({
+        path: page.path,
+        element: <page.component />,
+      })),
+      
+      // Default landing page redirect to login
+      { index: true, element: <Navigate to="/login" replace /> },
+
+      // Protected routes wrapped in Layout
+      {
+        element: <ProtectedRoute />,
         children: [
-            {
-                index: true,
-                element: <LoginPage />,
-            },
-            {
-                path: "login",
-                element: <LoginPage />,
-            },
-            {
-                path: "signup",
-                element: <SignupPage />,
-            },
-            {
-                path: "dashboard",
-                element: <ProtectedRoute />,
-                children: [
-                    {
-                        index: true,
-                        element: <Dashboard />,
-                    },
-                ],
-            },
-            {
-                path: "student-dashboard",
-                element: <ProtectedRoute />,
-                children: [
-                    {
-                        index: true,
-                        element: <StudentDashboard />,
-                    },
-                ],
-            },
+          {
+            element: <Layout />,
+            children: protectedPages.map((page) => ({
+              path: page.path,
+              element: <page.component />,
+            })),
+          },
         ],
-    },
+      },
+    ],
+  },
 ]);
 
 export default router;

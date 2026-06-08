@@ -22,7 +22,7 @@ const Topbar = () => {
           <div className="w-[7px] h-[7px] bg-[#e8590c] rounded-full absolute top-[7px] right-[7px] border-[1.5px] border-white"></div>
         </div>
         <div className="w-[34px] h-[34px] rounded-full bg-gradient-to-br from-[#3b5bdb] to-[#9c36b5] flex items-center justify-center text-[12px] font-medium text-white">
-          SA
+          profile
         </div>
       </div>
     </div>
