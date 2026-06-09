@@ -3,8 +3,9 @@ import crypto from 'crypto';
 import { pool } from '../../config/db.config';
 import { CustomError } from '../../error/customErrors';
 import { generateToken } from '../../config/jwt.config';
+import { User } from './user.model';
 
-export const registerUser = async (userData: any) => {
+export const registerUser = async (userData: any): Promise<User> => {
     const { email, password, role } = userData;
 
     try {
@@ -18,7 +19,7 @@ export const registerUser = async (userData: any) => {
         // 2. Hash the password
         const hashedPassword = await bcrypt.hash(password, 12);
 
-        // 3. Generate UUID for the id (Primary Key)
+        // 3. Generate UUID
         const id = crypto.randomUUID();
 
         // 4. Insert user
@@ -27,7 +28,7 @@ export const registerUser = async (userData: any) => {
             VALUES ($1, $2, $3, $4) 
             RETURNING id, email, role
         `;
-        const result = await pool.query(query, [id, email, hashedPassword, role || 'student']);
+        const result = await pool.query(query, [id, email, hashedPassword, role]);
 
         return result.rows[0];
     } catch (error: any) {
