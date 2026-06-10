@@ -3,6 +3,7 @@ import { Router } from 'express';
 import authRoutes from '../feats/auth/auth.routes';
 import tutorRoutes from '../feats/tutorModule/tutor/tutor.routes';
 import studentRoutes from '../feats/studentModule/student/student.routes';
+import institutionRoutes from '../feats/institutionModule/institution/institution.routes';
 
 const router = Router();
 
@@ -13,5 +14,5 @@ const router = Router();
 router.use('/auth', authRoutes);
 router.use('/tutors', tutorRoutes);
 router.use('/students', studentRoutes);
-
+router.use('/institutions', institutionRoutes);
 export default router;
