@@ -1,0 +1,70 @@
+import React from 'react';
+import { useTutors, useDeleteTutor, useUpdateTutor, TutorCard } from '../features/tutor';
+import LoadingComponent from '../components/ui/LoadingComponent';
+
+const TutorsPage = () => {
+    const { data: tutorsData, isLoading, isError, error } = useTutors();
+    const { mutate: deleteTutor } = useDeleteTutor();
+    const { mutate: updateTutor } = useUpdateTutor();
+
+    if (isLoading) {
+        return <LoadingComponent message="Loading tutors..." />;
+    }
+
+    if (isError) {
+        return (
+            <div className="p-6 text-center text-red-500 bg-red-50 rounded-lg m-6 border border-red-200">
+                <p className="font-semibold">Failed to load tutors</p>
+                <p className="text-sm mt-1">{error?.message || 'Please try again later.'}</p>
+            </div>
+        );
+    }
+
+    const tutors = Array.isArray(tutorsData) 
+        ? tutorsData 
+        : (tutorsData?.data || tutorsData?.tutors || []);
+
+    const handleDelete = (id) => {
+        if (window.confirm('Are you sure you want to permanently delete this tutor?')) {
+            deleteTutor(id);
+        }
+    };
+
+    const handleEdit = (tutor) => {
+        const tutorId = tutor.id || tutor._id;
+        // Functional placeholder for edit: update the hourly rate
+        const newRate = window.prompt("Edit tutor's hourly rate (৳):", tutor.hourly_rate || '');
+        
+        if (newRate !== null && newRate !== String(tutor.hourly_rate)) {
+            updateTutor({ id: tutorId, data: { hourly_rate: Number(newRate) } });
+        }
+    };
+
+    return (
+        <div className="p-6 max-w-7xl mx-auto space-y-6 h-full">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h1 className="text-2xl font-bold text-gray-900">Tutors Management</h1>
+                {/* Add button removed as requested */}
+            </div>
+
+            {tutors.length === 0 ? (
+                <div className="text-center text-gray-500 py-16 bg-white rounded-xl shadow-sm border border-gray-200">
+                    <p className="text-lg font-medium">No tutors found.</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {tutors.map((tutor) => (
+                        <TutorCard 
+                            key={tutor.id || tutor._id || Math.random()} 
+                            tutor={tutor} 
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default TutorsPage;

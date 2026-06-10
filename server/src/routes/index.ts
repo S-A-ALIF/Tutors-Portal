@@ -1,7 +1,7 @@
 import { Router } from 'express';
 // Example imports - you will populate these as you build features
 import authRoutes from '../feats/auth/auth.routes';
-// import tutorRoutes from '../feats/tutor/tutor.routes';
+import tutorRoutes from '../feats/tutorModule/tutor/tutor.routes';
 import studentRoutes from '../feats/studentModule/student/student.routes';
 
 const router = Router();
@@ -11,7 +11,7 @@ const router = Router();
  * Routes are grouped by their respective feature modules
  */
 router.use('/auth', authRoutes);
-// router.use('/tutors', tutorRoutes);
+router.use('/tutors', tutorRoutes);
 router.use('/students', studentRoutes);
 
 export default router;
