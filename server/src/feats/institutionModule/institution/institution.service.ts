@@ -4,8 +4,11 @@ import { CustomError } from '../../../error/customErrors';
 import { Institution } from './institution.model';
 
 export const createInstitution = async (institutionData: any): Promise<Institution> => {
-    const { name, email, phone_number, address, logo_url, is_active } = institutionData;
-
+    const { name, email, phone_number, address, logo_url, is_active, user_id } = institutionData;
+    
+    if (!user_id) {
+        throw new CustomError('User ID is required to link the institution', 400);
+    }
     try {
         if (email) {
             const checkQuery = 'SELECT id FROM institutions WHERE email = $1';
@@ -18,11 +21,11 @@ export const createInstitution = async (institutionData: any): Promise<Instituti
         const id = crypto.randomUUID();
         const query = `
             INSERT INTO institutions (
-                id, name, email, phone_number, address, logo_url, is_active
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7) 
+                id, name, email, phone_number, address, logo_url, is_active, user_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
             RETURNING *
         `;
-        const values = [id, name, email, phone_number, address, logo_url, is_active];
+        const values = [id, name, email, phone_number, address, logo_url, is_active, user_id];
         const result = await pool.query(query, values);
 
         return result.rows[0];

@@ -14,6 +14,7 @@ export const institutionSchema = {
             address: z.string().optional().nullable(),
             logo_url: z.string().url("Invalid URL format").optional().nullable(),
             is_active: z.boolean().optional(),
+            user_id: z.string().uuid("Invalid user ID format"), // ADDED THIS
         }),
     }),
     update: z.object({

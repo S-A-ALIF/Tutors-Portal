@@ -1,90 +1,58 @@
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { InstitutionProfileForm } from '../features/institution';
 
 const ProfilePage = () => {
-    // Pull the currently logged-in user from context
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
     
-    // Safely extract the role (handling potential nesting from the backend)
-    // Defaulting to 'student' purely as a fallback if user data is still loading
-    const role = user?.role || user?.data?.role || user?.user?.role || 'student';
+    // Safely extract user_info (handles both Axios wrapper and raw object)
+    const user_info = user?.data || user;
+
+    // State to toggle the Create/Edit Profile Form visibility
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+
+    // DEBUG: This will print the exact structure of your user_info object to the console
+    useEffect(() => {
+        if (!loading) {
+            console.log("DEBUG: Full User_info Object from AuthContext:", user_info);
+            if (!user_info) {
+                console.warn("DEBUG: User_info object is null or undefined!");
+            } else {
+                console.log("DEBUG: User_info Role found:", user_info.role);
+            }
+        }
+    }, [user, loading, user_info]);
+
+    // Handle loading state strictly to prevent premature rendering
+    if (loading) {
+        return <div className="p-10 text-center text-xl text-gray-600">Authenticating...</div>;
+    }
+
+    // If no user_info exists after loading, redirect or show error
+    if (!user_info) {
+        return <div className="p-10 text-center text-xl text-red-500">No user data found. Please login.</div>;
+    }
+
+    // Extract role securely
+    const role = user_info.role || 'no-role-found';
+    
+    // FIX: Look for user_info.profile instead of user_info.institution
+    const profileData = user_info.profile; 
 
     // ==========================================
-    // MOCK DATA (Based strictly on your models)
+    // MOCK DETAILS DATA (For Student/Tutor)
     // ==========================================
-
-    // 1. User Model (Institution/Admin)
-    const mockInstitutionUser = {
-        id: "usr_inst_001",
-        email: "admin@brillianttutors.com",
-        role: "admin",
-        createdAt: new Date("2023-01-15T10:00:00Z").toLocaleDateString()
-    };
-
-    // 2. Institution Model
-    const mockInstitution = {
-        id: "inst_100",
-        name: "Brilliant Tutors Academy",
-        email: "contact@brillianttutors.com",
-        phone_number: "+1-555-0198",
-        address: "123 Education Lane, Knowledge City",
-        logo_url: null,
-        is_active: true,
-        created_at: new Date("2023-01-15T10:00:00Z").toLocaleDateString()
-    };
-
-    // 3. User Model (Tutor)
-    const mockTutorUser = {
-        id: "usr_tut_002",
-        email: "johndoe@example.com",
-        role: "tutor",
-        createdAt: new Date("2023-06-20T14:30:00Z").toLocaleDateString()
-    };
-
-    // 4. Tutor Model
     const mockTutor = {
-        id: "tut_200",
-        user_id: "usr_tut_002",
-        first_name: "John",
-        last_name: "Doe",
-        email: "johndoe@example.com",
-        phone_number: "+1-555-0245",
-        bio: "Experienced Mathematics and Physics tutor with over 5 years of teaching.",
-        hourly_rate: 45,
-        monthly_salary: null,
-        subjects: ["Mathematics", "Physics", "Calculus"],
-        is_active: true,
-        created_at: new Date("2023-06-20T14:30:00Z").toLocaleDateString(),
-        updated_at: new Date("2023-08-01T09:15:00Z").toLocaleDateString()
+        id: "tut_200", user_info_id: user_info.id, first_name: "John", last_name: "Doe",
+        subjects: ["Mathematics", "Physics"], is_active: true, created_at: "2023-06-20"
     };
 
-    // 5. User Model (Student)
-    const mockStudentUser = {
-        id: "usr_stu_003",
-        email: "alice.smith@example.com",
-        role: "student",
-        createdAt: new Date("2023-09-01T08:00:00Z").toLocaleDateString()
-    };
-
-    // 6. Student Model
     const mockStudent = {
-        id: "stu_300",
-        user_id: "usr_stu_003",
-        first_name: "Alice",
-        last_name: "Smith",
-        email: "alice.smith@example.com",
-        phone_number: "+1-555-0399",
-        grade_level: "10th Grade",
-        school_name: "Lincoln High School",
-        is_active: true,
-        created_at: new Date("2023-09-01T08:00:00Z").toLocaleDateString(),
-        updated_at: new Date("2023-10-12T11:20:00Z").toLocaleDateString()
+        id: "stu_300", user_info_id: user_info.id, first_name: "Alice", last_name: "Smith",
+        grade: "10th", school: "Lincoln High", is_active: true, created_at: "2023-09-01"
     };
 
-    // ==========================================
-    // HELPER COMPONENT FOR CLEAN UI
-    // ==========================================
     const InfoRow = ({ label, value }) => {
-        // Handle booleans, arrays, and nulls cleanly
         let displayValue = value;
         if (typeof value === 'boolean') displayValue = value ? 'Yes' : 'No';
         if (Array.isArray(value)) displayValue = value.join(', ');
@@ -104,125 +72,137 @@ const ProfilePage = () => {
         <div className="p-6 max-w-7xl mx-auto">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-gray-900">Profile Overview</h1>
-                <p className="text-gray-500 mt-1 capitalize">Viewing profile details for: {role}</p>
+                <p className="text-gray-500 mt-1 capitalize">Logged in as: <strong>{role}</strong></p>
             </div>
 
-            {/* Grid Layout for the Sections */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-
-                {/* ========================================== */}
-                {/* ADMIN ROLE ONLY: INSTITUTION INFO          */}
-                {/* ========================================== */}
+                
+                {/* ADMIN SECTIONS */}
                 {role === 'admin' && (
                     <>
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-fit">
                             <div className="bg-blue-50 px-6 py-4 border-b border-gray-200">
-                                <h2 className="text-lg font-semibold text-blue-800">Institution User Info</h2>
+                                <h2 className="text-lg font-semibold text-blue-800">Admin User Info</h2>
                             </div>
-                            <div className="p-6 flex flex-col">
-                                <InfoRow label="User ID" value={mockInstitutionUser.id} />
-                                <InfoRow label="Email" value={mockInstitutionUser.email} />
-                                <InfoRow label="Role" value={mockInstitutionUser.role.toUpperCase()} />
-                                <InfoRow label="Created At" value={mockInstitutionUser.createdAt} />
+                            <div className="p-6">
+                                <InfoRow label="User ID" value={user_info.id} />
+                                <InfoRow label="Email" value={user_info.email} />
+                                <InfoRow label="Role" value={user_info.role} />
+                                <InfoRow label="Created At" value={user_info.createdAt || user_info.created_at} />
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                            <div className="bg-blue-50 px-6 py-4 border-b border-gray-200">
-                                <h2 className="text-lg font-semibold text-blue-800">Institution Details</h2>
+                        {/* FIX: Check for profileData and if we are NOT currently editing */}
+                        {profileData && !isEditingProfile ? (
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-fit">
+                                <div className="bg-blue-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                                    <h2 className="text-lg font-semibold text-blue-800">Institution Details</h2>
+                                    {/* Added an Edit Button to trigger the form */}
+                                    <button 
+                                        onClick={() => setIsEditingProfile(true)}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-4 rounded transition-colors"
+                                    >
+                                        Edit
+                                    </button>
+                                </div>
+                                <div className="p-6">
+                                    <InfoRow label="Institution ID" value={profileData.id} />
+                                    <InfoRow label="Name" value={profileData.name} />
+                                    <InfoRow label="Email" value={profileData.email} />
+                                    <InfoRow label="Phone" value={profileData.phone_number} />
+                                    <InfoRow label="Address" value={profileData.address} />
+                                    <InfoRow label="Status" value={profileData.is_active} />
+                                </div>
                             </div>
-                            <div className="p-6 flex flex-col">
-                                <InfoRow label="Institution ID" value={mockInstitution.id} />
-                                <InfoRow label="Name" value={mockInstitution.name} />
-                                <InfoRow label="Email" value={mockInstitution.email} />
-                                <InfoRow label="Phone Number" value={mockInstitution.phone_number} />
-                                <InfoRow label="Address" value={mockInstitution.address} />
-                                <InfoRow label="Logo URL" value={mockInstitution.logo_url} />
-                                <InfoRow label="Active Status" value={mockInstitution.is_active} />
-                                <InfoRow label="Created At" value={mockInstitution.created_at} />
+                        ) : (
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-fit">
+                                {!profileData && !isEditingProfile ? (
+                                    <>
+                                        <div className="bg-blue-50 px-6 py-4 border-b border-gray-200">
+                                            <h2 className="text-lg font-semibold text-blue-800">Institution Details</h2>
+                                        </div>
+                                        <div className="p-8 flex flex-col items-center justify-center bg-gray-50/50">
+                                            <div className="text-center">
+                                                <div className="bg-yellow-100 text-yellow-800 p-3 rounded-full inline-block mb-4">
+                                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                                </div>
+                                                <h3 className="text-xl font-bold text-gray-900 mb-2">Profile Incomplete</h3>
+                                                <p className="text-gray-500 mb-6 max-w-sm">Your admin account requires an associated institution profile to unlock full platform features.</p>
+                                                <button 
+                                                    onClick={() => setIsEditingProfile(true)}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-6 rounded-lg transition-colors shadow-sm"
+                                                >
+                                                    Create Profile Now
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    /* FIX: Added initialData prop here! */
+                                    <InstitutionProfileForm 
+                                        userId={user_info.id}
+                                        initialData={profileData} 
+                                        onCancel={() => setIsEditingProfile(false)} 
+                                        onSuccess={() => setIsEditingProfile(false)} 
+                                    />
+                                )}
                             </div>
-                        </div>
+                        )}
                     </>
                 )}
 
-                {/* ========================================== */}
-                {/* ADMIN & TUTOR ROLES: TUTOR INFO            */}
-                {/* ========================================== */}
-                {(role === 'admin' || role === 'tutor') && (
+                {/* TUTOR SECTIONS */}
+                {(role === 'tutor') && (
                     <>
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-fit">
                             <div className="bg-green-50 px-6 py-4 border-b border-gray-200">
                                 <h2 className="text-lg font-semibold text-green-800">Tutor User Info</h2>
                             </div>
-                            <div className="p-6 flex flex-col">
-                                <InfoRow label="User ID" value={mockTutorUser.id} />
-                                <InfoRow label="Email" value={mockTutorUser.email} />
-                                <InfoRow label="Role" value={mockTutorUser.role.toUpperCase()} />
-                                <InfoRow label="Created At" value={mockTutorUser.createdAt} />
+                            <div className="p-6">
+                                <InfoRow label="User ID" value={user_info.id} />
+                                <InfoRow label="Email" value={user_info.email} />
+                                <InfoRow label="Role" value={user_info.role} />
+                                <InfoRow label="Created At" value={user_info.createdAt || user_info.created_at} />
                             </div>
                         </div>
-
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-fit">
                             <div className="bg-green-50 px-6 py-4 border-b border-gray-200">
                                 <h2 className="text-lg font-semibold text-green-800">Tutor Details</h2>
                             </div>
-                            <div className="p-6 flex flex-col">
-                                <InfoRow label="Tutor ID" value={mockTutor.id} />
-                                <InfoRow label="Linked User ID" value={mockTutor.user_id} />
+                            <div className="p-6">
                                 <InfoRow label="First Name" value={mockTutor.first_name} />
-                                <InfoRow label="Last Name" value={mockTutor.last_name} />
-                                <InfoRow label="Contact Email" value={mockTutor.email} />
-                                <InfoRow label="Phone Number" value={mockTutor.phone_number} />
-                                <InfoRow label="Bio" value={mockTutor.bio} />
-                                <InfoRow label="Hourly Rate" value={mockTutor.hourly_rate ? `$${mockTutor.hourly_rate}/hr` : null} />
-                                <InfoRow label="Monthly Salary" value={mockTutor.monthly_salary ? `$${mockTutor.monthly_salary}` : null} />
                                 <InfoRow label="Subjects" value={mockTutor.subjects} />
-                                <InfoRow label="Active Status" value={mockTutor.is_active} />
-                                <InfoRow label="Created At" value={mockTutor.created_at} />
-                                <InfoRow label="Updated At" value={mockTutor.updated_at} />
+                                <InfoRow label="Status" value={mockTutor.is_active} />
                             </div>
                         </div>
                     </>
                 )}
 
-                {/* ========================================== */}
-                {/* STUDENT ROLE ONLY: STUDENT INFO            */}
-                {/* ========================================== */}
+                {/* STUDENT SECTIONS */}
                 {role === 'student' && (
                     <>
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-fit">
                             <div className="bg-purple-50 px-6 py-4 border-b border-gray-200">
                                 <h2 className="text-lg font-semibold text-purple-800">Student User Info</h2>
                             </div>
-                            <div className="p-6 flex flex-col">
-                                <InfoRow label="User ID" value={mockStudentUser.id} />
-                                <InfoRow label="Email" value={mockStudentUser.email} />
-                                <InfoRow label="Role" value={mockStudentUser.role.toUpperCase()} />
-                                <InfoRow label="Created At" value={mockStudentUser.createdAt} />
+                            <div className="p-6">
+                                <InfoRow label="User ID" value={user_info.id} />
+                                <InfoRow label="Email" value={user_info.email} />
+                                <InfoRow label="Role" value={user_info.role} />
+                                <InfoRow label="Created At" value={user_info.createdAt || user_info.created_at} />
                             </div>
                         </div>
-
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-fit">
                             <div className="bg-purple-50 px-6 py-4 border-b border-gray-200">
                                 <h2 className="text-lg font-semibold text-purple-800">Student Details</h2>
                             </div>
-                            <div className="p-6 flex flex-col">
-                                <InfoRow label="Student ID" value={mockStudent.id} />
-                                <InfoRow label="Linked User ID" value={mockStudent.user_id} />
-                                <InfoRow label="First Name" value={mockStudent.first_name} />
-                                <InfoRow label="Last Name" value={mockStudent.last_name} />
-                                <InfoRow label="Contact Email" value={mockStudent.email} />
-                                <InfoRow label="Phone Number" value={mockStudent.phone_number} />
-                                <InfoRow label="Grade Level" value={mockStudent.grade_level} />
-                                <InfoRow label="School Name" value={mockStudent.school_name} />
-                                <InfoRow label="Active Status" value={mockStudent.is_active} />
-                                <InfoRow label="Created At" value={mockStudent.created_at} />
-                                <InfoRow label="Updated At" value={mockStudent.updated_at} />
+                            <div className="p-6">
+                                <InfoRow label="Grade" value={mockStudent.grade} />
+                                <InfoRow label="School" value={mockStudent.school} />
                             </div>
                         </div>
                     </>
                 )}
-
             </div>
         </div>
     );

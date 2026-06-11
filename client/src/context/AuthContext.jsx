@@ -70,13 +70,32 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('user');
     };
 
+    // Update user state dynamically (e.g., after profile creation)
+    const updateUser = (newProfileData) => {
+        setUser((prevUser) => {
+            if (!prevUser) return prevUser;
+            
+            // This safely targets the flat profile object shown in your console log
+            const updatedUser = {
+                ...prevUser,
+                profile: {
+                    ...(prevUser.profile || {}),
+                    ...newProfileData
+                }
+            };
+            
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            return updatedUser;
+        });
+    };
+
     // Prevent protected routes from kicking the user out before storage is checked
     if (isInitializing) {
         return null; 
     }
 
     return (
-        <AuthContext.Provider value={{ user, login, signup, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, signup, logout, updateUser, loading }}>
             {children}
         </AuthContext.Provider>
     );

@@ -10,5 +10,6 @@ export interface Institution {
     address: string | null;
     logo_url: string | null;
     is_active: boolean;
+    user_id?: string; // Foreign key to link to the User
     created_at?: Date;
 }

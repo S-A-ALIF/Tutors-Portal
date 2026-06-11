@@ -56,7 +56,21 @@ export const loginUser = async (email: string, password: string) => {
             throw new CustomError('Invalid email or password', 401);
         }
 
-        // 4. Generate JWT
+        // 4. Fetch associated profile based on role
+        let profile = null;
+        
+        if (user.role === 'admin') {
+            const instResult = await pool.query('SELECT * FROM institutions WHERE user_id = $1', [user.id]);
+            profile = instResult.rows[0] || null;
+        } else if (user.role === 'tutor') {
+            const tutorResult = await pool.query('SELECT * FROM tutors WHERE user_id = $1', [user.id]);
+            profile = tutorResult.rows[0] || null;
+        } else if (user.role === 'student') {
+            const studentResult = await pool.query('SELECT * FROM students WHERE user_id = $1', [user.id]);
+            profile = studentResult.rows[0] || null;
+        }
+
+        // 5. Generate JWT
         const token = generateToken({ id: user.id, role: user.role });
 
         return {
@@ -64,7 +78,8 @@ export const loginUser = async (email: string, password: string) => {
             user: {
                 id: user.id,
                 email: user.email,
-                role: user.role
+                role: user.role,
+                profile // Automatically contains institution, tutor, or student data (or null if not created yet)
             }
         };
     } catch (error: any) {

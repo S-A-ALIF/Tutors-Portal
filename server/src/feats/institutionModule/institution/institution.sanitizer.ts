@@ -15,6 +15,9 @@ export const sanitizeInstitution = (data: any, isUpdate = false) => {
     
     if (data.is_active !== undefined) sanitized.is_active = data.is_active;
 
+    // ADDED THIS: Extract user_id
+    if (data.user_id !== undefined) sanitized.user_id = data.user_id;
+
     // For creation only: supply default values for missing fields
     if (!isUpdate) {
         if (sanitized.is_active === undefined) sanitized.is_active = true;
