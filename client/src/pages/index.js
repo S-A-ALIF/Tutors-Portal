@@ -17,6 +17,7 @@ import RecentTransactions from "./RecentTransactionsPage";
 import AllResults from "./AllResultsPage";
 import ProfilePage from "./ProfilePage";
 import NotificationPage from "./NotificationPage";
+import TutorDashboard from "./TutorDashboard";
 
 export const pages = [
     {
@@ -114,4 +115,9 @@ export const pages = [
     component: NotificationPage,
     isProtected: true,
   },
+  {
+    path: "tutor-dashboard",
+    component: TutorDashboard,
+    isProtected: true,
+  }
 ];

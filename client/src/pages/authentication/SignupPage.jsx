@@ -52,7 +52,8 @@ const SignupPage = () => {
 
     const roleOptions = [
         { label: 'Student', value: 'student' },
-        { label: 'Tutor', value: 'tutor' }
+        { label: 'Tutor', value: 'tutor' },
+        { label: 'Admin', value: 'admin' }
     ];
 
     return (

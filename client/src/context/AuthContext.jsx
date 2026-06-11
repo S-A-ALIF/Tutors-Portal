@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../features/authentication/services/authServices';
 
 const AuthContext = createContext();
@@ -6,6 +6,27 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [isInitializing, setIsInitializing] = useState(true);
+
+    // Rehydrate user from storage on initial load/refresh
+    useEffect(() => {
+        const initAuth = () => {
+            try {
+                const storedUser = localStorage.getItem('user'); 
+                
+                if (storedUser && storedUser !== 'undefined' && storedUser !== 'null') {
+                    setUser(JSON.parse(storedUser));
+                }
+            } catch (error) {
+                console.error("DEBUG: Failed to parse stored user during initialization:", error);
+                localStorage.removeItem('user');
+            } finally {
+                setIsInitializing(false);
+            }
+        };
+
+        initAuth();
+    }, []);
 
     const signup = async (userData) => {
         setLoading(true);
@@ -24,11 +45,12 @@ export const AuthProvider = ({ children }) => {
         try {
             const userData = await authService.login(credentials);
             
-            // DEBUG: Check what the service is actually returning
             console.log("DEBUG: Data received from authService.login:", userData);
             
             if (userData) {
                 setUser(userData);
+                // Ensure data survives a refresh
+                localStorage.setItem('user', JSON.stringify(userData));
             } else {
                 console.error("DEBUG: authService.login returned undefined or null");
             }
@@ -45,7 +67,13 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         authService.logout();
         setUser(null);
+        localStorage.removeItem('user');
     };
+
+    // Prevent protected routes from kicking the user out before storage is checked
+    if (isInitializing) {
+        return null; 
+    }
 
     return (
         <AuthContext.Provider value={{ user, login, signup, logout, loading }}>

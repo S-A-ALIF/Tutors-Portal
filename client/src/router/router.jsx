@@ -13,7 +13,7 @@ const router = createBrowserRouter([
     path: "/",
     element: <App />,
     children: [
-      // Map public pages
+      // Map public pages directly so you can freely navigate to them
       ...publicPages.map((page) => ({
         path: page.path,
         element: <page.component />,
