@@ -45,8 +45,6 @@ export const AuthProvider = ({ children }) => {
         try {
             const userData = await authService.login(credentials);
             
-            console.log("DEBUG: Data received from authService.login:", userData);
-            
             if (userData) {
                 setUser(userData);
                 // Ensure data survives a refresh
@@ -75,15 +73,30 @@ export const AuthProvider = ({ children }) => {
         setUser((prevUser) => {
             if (!prevUser) return prevUser;
             
-            // This safely targets the flat profile object shown in your console log
-            const updatedUser = {
-                ...prevUser,
-                profile: {
-                    ...(prevUser.profile || {}),
-                    ...newProfileData
-                }
-            };
+            // Clone the previous state so we can mutate it safely
+            let updatedUser = { ...prevUser };
+
+            // FIX: Check if the user object has a nested '.data' property (Axios wrapper)
+            if (updatedUser.data) {
+                updatedUser.data = {
+                    ...updatedUser.data,
+                    profile: {
+                        ...(updatedUser.data.profile || {}),
+                        ...newProfileData
+                    }
+                };
+            } else {
+                // Fallback for flat structure
+                updatedUser = {
+                    ...updatedUser,
+                    profile: {
+                        ...(updatedUser.profile || {}),
+                        ...newProfileData
+                    }
+                };
+            }
             
+            console.log("DEBUG: Context updated with new profile:", updatedUser);
             localStorage.setItem('user', JSON.stringify(updatedUser));
             return updatedUser;
         });

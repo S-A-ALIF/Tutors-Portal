@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useCreateInstitution, useUpdateInstitution } from '../hooks/institutionHooks';
 import { useAuth } from '../../../context/AuthContext';
 
-const InstitutionProfileForm = ({ userId, initialData = null, onCancel, onSuccess }) => {
+const InstitutionProfileForm = ({ userId, userEmail, initialData = null, onCancel, onSuccess }) => {
     const { updateUser } = useAuth();
     
     // Initialize React Query Mutations
@@ -14,22 +14,24 @@ const InstitutionProfileForm = ({ userId, initialData = null, onCancel, onSucces
 
     const [formData, setFormData] = useState({
         name: '',
-        email: '',
+        email: userEmail || '', // Initialize with userEmail
         phone_number: '',
         address: ''
     });
 
-    // Populate form if we are in edit mode
+    // Populate form if we are in edit mode, or just set the email if creating
     useEffect(() => {
-        if (initialData) {
+        if (initialData && Object.keys(initialData).length > 0) {
             setFormData({
                 name: initialData.name || '',
-                email: initialData.email || '',
+                email: initialData.email || userEmail || '',
                 phone_number: initialData.phone_number || '',
                 address: initialData.address || ''
             });
+        } else if (userEmail) {
+            setFormData(prev => ({ ...prev, email: userEmail }));
         }
-    }, [initialData]);
+    }, [initialData, userEmail]);
 
     const handleInputChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -53,10 +55,12 @@ const InstitutionProfileForm = ({ userId, initialData = null, onCancel, onSucces
                 responseData = await createInstitution(payload);
             }
 
+            console.log("DEBUG: Raw Response from API after saving:", responseData);
+
             // Extract the actual data payload (handles Axios wrapper if present)
             const profileData = responseData?.data ? responseData.data : responseData;
 
-            // FIX: Pass the flat profile data, NOT { institution: responseData }
+            // Update the global AuthContext so the UI instantly reflects the new/updated institution
             if (profileData) {
                  updateUser(profileData); 
             }
@@ -96,12 +100,12 @@ const InstitutionProfileForm = ({ userId, initialData = null, onCancel, onSucces
                     <input 
                         type="email" 
                         name="email" 
-                        required 
+                        readOnly
                         value={formData.email} 
-                        onChange={handleInputChange} 
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" 
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500 cursor-not-allowed outline-none" 
                         placeholder="contact@institution.com" 
                     />
+                    <p className="text-xs text-gray-400 mt-1">This email is synced with your main account.</p>
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
