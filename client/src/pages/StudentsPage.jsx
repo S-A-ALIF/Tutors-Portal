@@ -56,6 +56,42 @@ const StudentsPage = () => {
         }
     };
 
+    // Utility to extract a number for proper numeric sorting of grades (e.g., "Grade 10" vs "Grade 9")
+    const extractNumber = (str) => {
+        if (!str) return Infinity; 
+        const match = str.match(/\d+/);
+        return match ? parseInt(match[0], 10) : str;
+    };
+
+    // Group the students by Grade then Section
+    const groupedStudents = students.reduce((acc, student) => {
+        const grade = student.grade_level || student.class_grade || 'Unassigned Grade';
+        const section = student.section || 'Unassigned Section';
+        
+        if (!acc[grade]) {
+            acc[grade] = {};
+        }
+        if (!acc[grade][section]) {
+            acc[grade][section] = [];
+        }
+        acc[grade][section].push(student);
+        return acc;
+    }, {});
+
+    // Sort grades
+    const sortedGrades = Object.keys(groupedStudents).sort((a, b) => {
+        if (a === 'Unassigned Grade') return 1;
+        if (b === 'Unassigned Grade') return -1;
+        
+        const numA = extractNumber(a);
+        const numB = extractNumber(b);
+        
+        if (typeof numA === 'number' && typeof numB === 'number') {
+            if (numA !== numB) return numA - numB;
+        }
+        return a.localeCompare(b);
+    });
+
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6 h-full">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -67,15 +103,40 @@ const StudentsPage = () => {
                     <p className="text-lg font-medium">No students found.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {students.map((student) => (
-                        <StudentCard 
-                            key={student.id || student._id || Math.random()} 
-                            student={student} 
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                        />
-                    ))}
+                <div className="space-y-12">
+                    {sortedGrades.map((grade) => {
+                        const sections = groupedStudents[grade];
+                        const sortedSections = Object.keys(sections).sort((a, b) => {
+                            if (a === 'Unassigned Section') return 1;
+                            if (b === 'Unassigned Section') return -1;
+                            return a.localeCompare(b);
+                        });
+
+                        return (
+                            <div key={grade} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-6">
+                                <h2 className="text-2xl font-bold text-purple-900 border-b border-gray-100 pb-3">{grade}</h2>
+                                <div className="space-y-8">
+                                    {sortedSections.map((section) => (
+                                        <div key={`${grade}-${section}`} className="space-y-4">
+                                            <h3 className="text-lg font-semibold text-purple-700 bg-purple-50 px-3 py-1.5 rounded-md inline-block">
+                                                Section: {section}
+                                            </h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                                {sections[section].map((student) => (
+                                                    <StudentCard 
+                                                        key={student.id || student._id || Math.random()} 
+                                                        student={student} 
+                                                        onEdit={handleEdit}
+                                                        onDelete={handleDelete}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>

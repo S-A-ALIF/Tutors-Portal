@@ -7,6 +7,7 @@ import institutionRoutes from '../feats/institutionModule/institution/institutio
 import { enrollmentRoutes } from '../feats/enrollmentModule/enrollment';
 import invitationRoutes from '../feats/enrollmentModule/invitation/invitation.routes';
 import { emailRoutes } from '../feats/email';
+import examRoutes from '../feats/examModule/exam/exam.routes';
 
 const router = Router();
 
@@ -21,5 +22,6 @@ router.use('/institutions', institutionRoutes);
 router.use('/enrollments', enrollmentRoutes);
 router.use('/invitations', invitationRoutes);
 router.use('/send-emails', emailRoutes);
+router.use('/exams', examRoutes);
 
 export default router;

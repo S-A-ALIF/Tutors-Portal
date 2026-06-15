@@ -9,6 +9,8 @@ export const invitationSchema = {
             academic_year: z.string().optional().nullable(),
             grade: z.string().optional().nullable(),
             section: z.string().optional().nullable(),
+            roll_no: z.string().optional().nullable(),
+            monthly_fee: z.number().nonnegative().optional().nullable(),
             expiry_option: z.enum(['10m', '1h', '24h', '7d']).default('24h')
         }).superRefine((data, ctx) => {
             if (data.role === 'student') {

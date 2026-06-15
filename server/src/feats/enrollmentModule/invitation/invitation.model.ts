@@ -9,5 +9,7 @@ export interface Invitation {
     academic_year?: string | null;
     grade?: string | null;
     section?: string | null;
+    roll_no?: string | null;
+    monthly_fee?: number | null;
     created_at?: Date;
 }

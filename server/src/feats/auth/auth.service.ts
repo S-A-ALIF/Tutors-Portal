@@ -91,18 +91,27 @@ export const getMe = async (userId: string, role: string) => {
             
         } else if (role === 'tutor') {
             const tutorQuery = `
-                SELECT t.* FROM tutors t 
+                SELECT t.*, i.name as institution_name 
+                FROM tutors t 
                 JOIN user_tutors ut ON t.id = ut.tutor_id 
+                LEFT JOIN tutor_institutions ti ON t.id = ti.tutor_id
+                LEFT JOIN institutions i ON ti.inst_id = i.id
                 WHERE ut.user_id = $1
+                LIMIT 1
             `;
             const tutorResult = await pool.query(tutorQuery, [userId]);
             profile = tutorResult.rows[0] || null;
             
         } else if (role === 'student') {
             const studentQuery = `
-                SELECT s.* FROM students s 
+                SELECT s.*, i.name as institution_name
+                FROM students s 
                 JOIN user_students us ON s.id = us.student_id 
+                LEFT JOIN student_enrollments se ON s.id = se.student_id AND se.status = 'active'
+                LEFT JOIN institution_enrollments ie ON se.enrollment_id = ie.enrollment_id
+                LEFT JOIN institutions i ON ie.inst_id = i.id
                 WHERE us.user_id = $1
+                LIMIT 1
             `;
             const studentResult = await pool.query(studentQuery, [userId]);
             profile = studentResult.rows[0] || null;

@@ -21,7 +21,7 @@ const generateCode = (): string => {
 };
 
 export const sendInvitation = async (data: any): Promise<Invitation> => {
-    const { inst_id, email, role, academic_year, grade, section, expiry_option } = data;
+    const { inst_id, email, role, academic_year, grade, section, expiry_option, roll_no, monthly_fee } = data;
     const assignedRole = role || 'student';
 
     const client = await pool.connect();
@@ -41,10 +41,10 @@ export const sendInvitation = async (data: any): Promise<Invitation> => {
 
         const query = `
             INSERT INTO invitations (
-                id, inst_id, email, code, expires_at, role, academic_year, grade, section
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
+                id, inst_id, email, code, expires_at, role, academic_year, grade, section, roll_no, monthly_fee
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *
         `;
-        const values = [id, inst_id, email, code, expires_at, assignedRole, academic_year || null, grade || null, section || null];
+        const values = [id, inst_id, email, code, expires_at, assignedRole, academic_year || null, grade || null, section || null, roll_no || null, monthly_fee || null];
         
         const result = await client.query(query, values);
         const invitation = result.rows[0];
@@ -177,6 +177,8 @@ export const verifyInvitation = async (code: string, user_id: string): Promise<a
                 academic_year: invitation.academic_year,
                 grade: invitation.grade,
                 section: invitation.section,
+                roll_no: invitation.roll_no,
+                monthly_fee: invitation.monthly_fee,
                 status: 'active'
             };
 

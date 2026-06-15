@@ -75,22 +75,44 @@ export const createStudent = async (studentData: any): Promise<StudentDetails> =
     }
 };
 
-export const getAllStudents = async (): Promise<StudentDetails[]> => {
+export const getAllStudents = async (): Promise<any[]> => {
     const query = `
-        SELECT s.*, us.user_id 
+        SELECT 
+            s.*, 
+            us.user_id,
+            e.grade as grade_level,
+            e.section,
+            e.roll_no,
+            e.monthly_fee,
+            inst.name as school_name
         FROM students s
         LEFT JOIN user_students us ON s.id = us.student_id
+        LEFT JOIN student_enrollments se ON s.id = se.student_id AND se.status = 'active'
+        LEFT JOIN enrollments e ON se.enrollment_id = e.id
+        LEFT JOIN institution_enrollments ie ON e.id = ie.enrollment_id
+        LEFT JOIN institutions inst ON ie.inst_id = inst.id
         ORDER BY s.created_at DESC
     `;
     const result = await pool.query(query);
     return result.rows;
 };
 
-export const getStudentById = async (id: string): Promise<StudentDetails> => {
+export const getStudentById = async (id: string): Promise<any> => {
     const query = `
-        SELECT s.*, us.user_id 
+        SELECT 
+            s.*, 
+            us.user_id,
+            e.grade as grade_level,
+            e.section,
+            e.roll_no,
+            e.monthly_fee,
+            inst.name as school_name
         FROM students s
         LEFT JOIN user_students us ON s.id = us.student_id
+        LEFT JOIN student_enrollments se ON s.id = se.student_id AND se.status = 'active'
+        LEFT JOIN enrollments e ON se.enrollment_id = e.id
+        LEFT JOIN institution_enrollments ie ON e.id = ie.enrollment_id
+        LEFT JOIN institutions inst ON ie.inst_id = inst.id
         WHERE s.id = $1
     `;
     const result = await pool.query(query, [id]);

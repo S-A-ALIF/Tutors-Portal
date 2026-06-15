@@ -53,6 +53,8 @@ const EnrollmentForm = ({ instId, onCancel, onSuccess }) => {
                     academic_year: formData.academic_year,
                     grade: formData.grade,
                     section: formData.section,
+                    roll_no: formData.roll_no,
+                    monthly_fee: formData.monthly_fee ? Number(formData.monthly_fee) : null,
                     expiry_option: formData.expiry_option
                 };
                 const responseData = await sendInvitation(payload);
@@ -194,13 +196,8 @@ const EnrollmentForm = ({ instId, onCancel, onSuccess }) => {
                         <FormInputField label="Grade/Class" name="grade" value={formData.grade} onChange={handleInputChange} required placeholder="10th Grade" />
                         <FormInputField label="Section (Optional)" name="section" value={formData.section} onChange={handleInputChange} placeholder="A" />
                         
-                        {/* Only needed for full enrollment right now */}
-                        {!isInviteMode && (
-                            <>
-                                <FormInputField label="Roll Number (Optional)" name="roll_no" value={formData.roll_no} onChange={handleInputChange} placeholder="101" />
-                                <FormInputField label="Monthly Fee (Optional)" name="monthly_fee" type="number" value={formData.monthly_fee} onChange={handleInputChange} placeholder="0.00" />
-                            </>
-                        )}
+                        <FormInputField label="Roll Number (Optional)" name="roll_no" value={formData.roll_no} onChange={handleInputChange} placeholder="101" />
+                        <FormInputField label="Monthly Fee (Optional)" name="monthly_fee" type="number" value={formData.monthly_fee} onChange={handleInputChange} placeholder="0.00" />
                     </div>
                 </div>
 

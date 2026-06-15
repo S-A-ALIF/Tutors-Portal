@@ -5,8 +5,8 @@ import Sidebar from './Sidebar';
 
 const Layout = ({ children }) => {
     return (
-        <div className="grid grid-cols-[220px_1fr] grid-rows-[64px_1fr] h-screen overflow-hidden bg-[#f7f7fb]">
-            <div className="col-span-2 border-b border-gray-200">
+        <div className="grid grid-cols-[220px_1fr] grid-rows-[60px_1fr] h-screen overflow-hidden bg-[#f7f7fb]">
+            <div className="col-span-2">
                 <Topbar />
             </div>
             <div className="w-[220px] h-full overflow-y-auto">

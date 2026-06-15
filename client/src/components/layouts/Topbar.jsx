@@ -1,8 +1,18 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import NotificationDropdown from './NotificationDropdown';
+import { useAuth } from '../../context/AuthContext';
 
 const Topbar = () => {
+  const { user } = useAuth();
+  
+  const role = user?.role || user?.data?.role;
+  const profile = user?.profile || user?.data?.profile;
+  
+  // Assuming 'name' exists on the institution profile (Admin)
+  // For students and tutors, the backend joins the institution and aliases it as 'institution_name'
+  const institutionName = role === 'admin' ? profile?.name : profile?.institution_name;
+
   return (
     <div className="col-[1/-1] flex items-center justify-between px-[28px] h-[60px] bg-white border-b border-[rgba(60,60,120,0.10)] sticky top-0 z-10">
       <div className="font-['Playfair_Display',serif] text-[18px] font-semibold text-[#1a1a2e] tracking-[-0.3px] flex items-center gap-[10px]">
@@ -14,9 +24,11 @@ const Topbar = () => {
         Tutor's Portal
       </div>
       <div className="flex items-center gap-[16px]">
-        <div className="text-[12px] font-medium text-[#3b5bdb] bg-[rgba(59,91,219,0.09)] px-[12px] py-[4px] rounded-[20px]">
-          Sunrise Academy
-        </div>
+        {institutionName && (
+            <div className="text-[12px] font-medium text-[#3b5bdb] bg-[rgba(59,91,219,0.09)] px-[12px] py-[4px] rounded-[20px]">
+              {institutionName}
+            </div>
+        )}
         
         <NotificationDropdown />
 
