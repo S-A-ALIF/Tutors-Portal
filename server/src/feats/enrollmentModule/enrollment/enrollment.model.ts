@@ -4,13 +4,21 @@
  */
 export interface Enrollment {
     id: string;
-    student_id: string;
-    inst_id: string;
     academic_year: string;
     grade: string;
     section: string | null;
     roll_no: string | null;
     monthly_fee: number | null;
-    is_current_year: boolean;
     created_at?: Date;
+}
+
+/**
+ * Extended interface including relational data from junction tables
+ */
+export interface EnrollmentDetails extends Enrollment {
+    student_id: string;
+    inst_id: string;
+    status: 'active' | 'graduated' | 'transferred' | 'expelled';
+    joined_at?: Date;
+    left_at?: Date | null;
 }

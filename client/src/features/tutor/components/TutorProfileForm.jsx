@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useCreateTutor, useUpdateTutor } from '../hooks/tutorHooks';
 import { useAuth } from '../../../context/AuthContext';
 
-const TutorProfileForm = ({ userId, userEmail, initialData = null, onCancel, onSuccess }) => {
+const TutorProfileForm = ({ userId, userRole,userEmail, initialData = null, onCancel, onSuccess }) => {
     const { updateUser } = useAuth();
     
     // Initialize React Query Mutations (Ensure these match your actual hook names)
@@ -47,11 +47,11 @@ const TutorProfileForm = ({ userId, userEmail, initialData = null, onCancel, onS
         
         try {
             let responseData;
-            
             // Format payload: ensure subjects are sent in the format your backend expects (e.g., array)
             const payload = {
                 ...formData,
                 user_id: userId,
+                user_role: userRole, // Include role if needed for backend logic
                 // Optional: convert "Math, Science" into ["Math", "Science"]
                 subjects: formData.subjects.split(',').map(s => s.trim()).filter(s => s) 
             };

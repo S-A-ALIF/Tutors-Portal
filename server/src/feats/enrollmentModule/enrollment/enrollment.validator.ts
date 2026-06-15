@@ -8,6 +8,8 @@ const studentIdParamSchema = z.object({
     studentId: z.string().uuid("Invalid student ID format"),
 });
 
+const statusEnum = z.enum(['active', 'graduated', 'transferred', 'expelled']);
+
 export const enrollmentSchema = {
     create: z.object({
         body: z.object({
@@ -18,19 +20,18 @@ export const enrollmentSchema = {
             section: z.string().optional().nullable(),
             roll_no: z.string().optional().nullable(),
             monthly_fee: z.number().nonnegative("Fee cannot be negative").optional().nullable(),
-            is_current_year: z.boolean().optional(),
+            status: statusEnum.optional(),
         }),
     }),
     update: z.object({
         params: idParamSchema,
         body: z.object({
-            inst_id: z.string().uuid("Valid institution ID is required").optional(),
             academic_year: z.string().optional(),
             grade: z.string().optional(),
             section: z.string().optional().nullable(),
             roll_no: z.string().optional().nullable(),
             monthly_fee: z.number().nonnegative().optional().nullable(),
-            is_current_year: z.boolean().optional(),
+            status: statusEnum.optional(),
         }).refine((data) => Object.keys(data).length > 0, {
             message: "At least one field must be provided for update",
         }),

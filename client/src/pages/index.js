@@ -10,6 +10,7 @@ import Tutors from "./TutorsPage";
 import LoginPage from "./authentication/LoginPage";
 import SignupPage from "./authentication/SignupPage";
 import EnrollStudent from "./EnrollStudentPage";
+import AcceptInvitationPage from "./AcceptInvitationPage";
 import CreateExam from "./CreateExamPage";
 import NewClass from "./NewClassPage";
 import RecordPayment from "./RecordPaymentPage";
@@ -118,6 +119,11 @@ export const pages = [
   {
     path: "tutor-dashboard",
     component: TutorDashboard,
+    isProtected: true,
+  },
+  {
+    path: "accept-invitation",
+    component: AcceptInvitationPage,
     isProtected: true,
   }
 ];

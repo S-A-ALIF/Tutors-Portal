@@ -32,8 +32,7 @@ export const getOne = async (req: Request, res: Response, next: NextFunction) =>
 
 export const updateOne = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        // Pass `true` to indicate this is an update operation
-        const sanitizedData = sanitizeInstitution(req.body, true);
+        const sanitizedData = sanitizeInstitution(req.body);
         
         const institution = await institutionService.updateInstitution(req.params.id, sanitizedData);
         res.status(200).json({ status: 'success', data: institution });

@@ -1,8 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTutors, useDeleteTutor, useUpdateTutor, TutorCard } from '../features/tutor';
 import LoadingComponent from '../components/ui/LoadingComponent';
+import InviteTutorModal from '../features/tutor/components/InviteTutorModal';
+import { useAuth } from '../context/AuthContext';
 
 const TutorsPage = () => {
+    const { user } = useAuth();
+    const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+    
+    const instId = user?.data?.inst_id || user?.inst_id || user?.data?.profile?.id || user?.id;
+
     const { data: tutorsData, isLoading, isError, error } = useTutors();
     const { mutate: deleteTutor } = useDeleteTutor();
     const { mutate: updateTutor } = useUpdateTutor();
@@ -44,7 +51,15 @@ const TutorsPage = () => {
         <div className="p-6 max-w-7xl mx-auto space-y-6 h-full">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h1 className="text-2xl font-bold text-gray-900">Tutors Management</h1>
-                {/* Add button removed as requested */}
+                <button 
+                    onClick={() => setIsInviteModalOpen(true)}
+                    className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Invite Tutor
+                </button>
             </div>
 
             {tutors.length === 0 ? (
@@ -63,6 +78,16 @@ const TutorsPage = () => {
                     ))}
                 </div>
             )}
+
+            <InviteTutorModal 
+                instId={instId}
+                isOpen={isInviteModalOpen}
+                onClose={() => setIsInviteModalOpen(false)}
+                onSuccess={(data) => {
+                    // Refetching happens via react-query in theory, but here we just alert success
+                    console.log('Tutor invited successfully', data);
+                }}
+            />
         </div>
     );
 };

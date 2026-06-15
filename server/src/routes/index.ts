@@ -5,6 +5,8 @@ import tutorRoutes from '../feats/tutorModule/tutor/tutor.routes';
 import studentRoutes from '../feats/studentModule/student/student.routes';
 import institutionRoutes from '../feats/institutionModule/institution/institution.routes';
 import { enrollmentRoutes } from '../feats/enrollmentModule/enrollment';
+import invitationRoutes from '../feats/enrollmentModule/invitation/invitation.routes';
+import { emailRoutes } from '../feats/email';
 
 const router = Router();
 
@@ -17,4 +19,7 @@ router.use('/tutors', tutorRoutes);
 router.use('/students', studentRoutes);
 router.use('/institutions', institutionRoutes);
 router.use('/enrollments', enrollmentRoutes);
+router.use('/invitations', invitationRoutes);
+router.use('/send-emails', emailRoutes);
+
 export default router;

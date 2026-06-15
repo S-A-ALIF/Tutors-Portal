@@ -56,17 +56,34 @@ export const loginUser = async (email: string, password: string) => {
             throw new CustomError('Invalid email or password', 401);
         }
 
-        // 4. Fetch associated profile based on role
+        // 4. Fetch associated profile based on role using junction tables
         let profile = null;
         
         if (user.role === 'admin') {
-            const instResult = await pool.query('SELECT * FROM institutions WHERE user_id = $1', [user.id]);
+            const instQuery = `
+                SELECT i.* FROM institutions i 
+                JOIN user_institutions ui ON i.id = ui.inst_id 
+                WHERE ui.user_id = $1
+            `;
+            const instResult = await pool.query(instQuery, [user.id]);
             profile = instResult.rows[0] || null;
+            
         } else if (user.role === 'tutor') {
-            const tutorResult = await pool.query('SELECT * FROM tutors WHERE user_id = $1', [user.id]);
+            const tutorQuery = `
+                SELECT t.* FROM tutors t 
+                JOIN user_tutors ut ON t.id = ut.tutor_id 
+                WHERE ut.user_id = $1
+            `;
+            const tutorResult = await pool.query(tutorQuery, [user.id]);
             profile = tutorResult.rows[0] || null;
+            
         } else if (user.role === 'student') {
-            const studentResult = await pool.query('SELECT * FROM students WHERE user_id = $1', [user.id]);
+            const studentQuery = `
+                SELECT s.* FROM students s 
+                JOIN user_students us ON s.id = us.student_id 
+                WHERE us.user_id = $1
+            `;
+            const studentResult = await pool.query(studentQuery, [user.id]);
             profile = studentResult.rows[0] || null;
         }
 

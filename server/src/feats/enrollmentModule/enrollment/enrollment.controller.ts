@@ -33,7 +33,8 @@ export const getByStudentId = async (req: Request, res: Response, next: NextFunc
 
 export const updateOne = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const enrollment = await enrollmentService.updateEnrollment(req.params.id, req.body);
+        const sanitizedData = sanitizeEnrollment(req.body, true);
+        const enrollment = await enrollmentService.updateEnrollment(req.params.id, sanitizedData);
         res.status(200).json({ status: 'success', data: enrollment });
     } catch (error) { next(error); }
 };

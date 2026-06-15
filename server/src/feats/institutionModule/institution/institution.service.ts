@@ -1,38 +1,63 @@
 import crypto from 'crypto';
 import { pool } from '../../../config/db.config';
 import { CustomError } from '../../../error/customErrors';
-import { Institution } from './institution.model';
+import { Institution, InstitutionCreationPayload } from './institution.model';
 
-export const createInstitution = async (institutionData: any): Promise<Institution> => {
-    const { name, email, phone_number, address, logo_url, is_active, user_id } = institutionData;
+export const createInstitution = async (institutionData: any): Promise<InstitutionCreationPayload> => {
+    const { name, email, phone_number, address, logo_url, user_id } = institutionData;
     
     if (!user_id) {
         throw new CustomError('User ID is required to link the institution', 400);
     }
+
+    const client = await pool.connect();
+
     try {
-        if (email) {
-            const checkQuery = 'SELECT id FROM institutions WHERE email = $1';
-            const existing = await pool.query(checkQuery, [email]);
-            if (existing.rows.length > 0) {
-                throw new CustomError('Institution with this email already exists', 409);
-            }
+        await client.query('BEGIN');
+
+        // Check if user exists
+        const userCheck = await client.query('SELECT id FROM users WHERE id = $1', [user_id]);
+        if (userCheck.rows.length === 0) {
+            throw new CustomError('User not found', 404);
+        }
+
+        // Check unique email constraint
+        const emailCheck = await client.query('SELECT id FROM institutions WHERE email = $1', [email]);
+        if (emailCheck.rows.length > 0) {
+            throw new CustomError('Institution with this email already exists', 409);
         }
 
         const id = crypto.randomUUID();
-        const query = `
+        
+        // 1. Insert into core institutions table
+        const instQuery = `
             INSERT INTO institutions (
-                id, name, email, phone_number, address, logo_url, is_active, user_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+                id, name, email, phone_number, address, logo_url
+            ) VALUES ($1, $2, $3, $4, $5, $6) 
             RETURNING *
         `;
-        const values = [id, name, email, phone_number, address, logo_url, is_active, user_id];
-        const result = await pool.query(query, values);
+        const instValues = [id, name, email, phone_number, address, logo_url];
+        const instResult = await client.query(instQuery, instValues);
 
-        return result.rows[0];
+        // 2. Insert into user_institutions junction table
+        await client.query(
+            `INSERT INTO user_institutions (user_id, inst_id) VALUES ($1, $2)`,
+            [user_id, id]
+        );
+
+        await client.query('COMMIT');
+
+        return {
+            ...instResult.rows[0],
+            user_id
+        };
     } catch (error: any) {
+        await client.query('ROLLBACK');
         if (error instanceof CustomError) throw error;
         console.error('Service Error [createInstitution]:', error);
         throw new CustomError('Database operation failed', 500);
+    } finally {
+        client.release();
     }
 };
 
@@ -50,7 +75,6 @@ export const getInstitutionById = async (id: string): Promise<Institution> => {
 export const updateInstitution = async (id: string, updateData: Partial<Institution>): Promise<Institution> => {
     const keys = Object.keys(updateData);
     
-    // Safety check: Prevent malformed SQL if no valid fields are provided
     if (keys.length === 0) {
         throw new CustomError('No valid fields provided for update', 400);
     }
@@ -59,13 +83,23 @@ export const updateInstitution = async (id: string, updateData: Partial<Institut
     const setClause = keys.map((key, index) => `${key} = $${index + 2}`).join(', ');
 
     const query = `UPDATE institutions SET ${setClause} WHERE id = $1 RETURNING *`;
-    const result = await pool.query(query, [id, ...values]);
     
-    if (result.rows.length === 0) throw new CustomError('Institution not found', 404);
-    return result.rows[0];
+    try {
+        const result = await pool.query(query, [id, ...values]);
+        if (result.rows.length === 0) throw new CustomError('Institution not found', 404);
+        return result.rows[0];
+    } catch (error: any) {
+        if (error.code === '23505') { // Postgres unique violation code
+            throw new CustomError('Institution with this email already exists', 409);
+        }
+        console.error('Service Error [updateInstitution]:', error);
+        throw new CustomError('Database operation failed during update', 500);
+    }
 };
 
 export const deleteInstitution = async (id: string): Promise<void> => {
+    // Note: Due to ON DELETE CASCADE on user_institutions, tutor_institutions, 
+    // and institution_enrollments, deleting the core record handles relations automatically.
     const result = await pool.query('DELETE FROM institutions WHERE id = $1', [id]);
     if (result.rowCount === 0) throw new CustomError('Institution not found', 404);
 };

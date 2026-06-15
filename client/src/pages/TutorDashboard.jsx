@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const TutorDashboard = () => {
@@ -15,11 +16,23 @@ const TutorDashboard = () => {
     return (
         <div className="p-6 max-w-7xl mx-auto w-full">
             {/* Header */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900">
-                    Welcome back, {user?.first_name || 'Tutor'}! 👋
-                </h1>
-                <p className="text-gray-500 mt-1">Here is your teaching overview for today.</p>
+            <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">
+                        Welcome back, {user?.first_name || 'Tutor'}! 👋
+                    </h1>
+                    <p className="text-gray-500 mt-1">Here is your teaching overview for today.</p>
+                </div>
+                
+                <div className="p-4 bg-green-50 rounded-lg border border-green-100 flex flex-col items-center sm:items-end text-center sm:text-right">
+                    <p className="text-sm text-green-700 font-medium mb-2">Have an Institution Invite Code?</p>
+                    <Link 
+                        to="/accept-invitation" 
+                        className="bg-green-600 hover:bg-green-700 text-white font-medium py-1.5 px-4 rounded-lg transition-colors text-sm"
+                    >
+                        Enter Code
+                    </Link>
+                </div>
             </div>
 
             {/* Stats Grid */}

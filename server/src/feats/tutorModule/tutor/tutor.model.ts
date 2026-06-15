@@ -1,9 +1,12 @@
+/**
+ * Tutor Model
+ * Defines the structure for the Tutor entity.
+ */
 export interface Tutor {
     id: string;
-    user_id?: string | null;
     first_name: string;
     last_name: string;
-    email?: string | null;
+    email?: string | null; // Added email
     phone_number: string;
     bio?: string | null;
     hourly_rate?: number | null;
@@ -12,4 +15,11 @@ export interface Tutor {
     is_active?: boolean;
     created_at?: Date;
     updated_at?: Date;
+}
+
+/**
+ * Extended interface including relational data from junction tables
+ */
+export interface TutorDetails extends Tutor {
+    inst_id?: string;
 }

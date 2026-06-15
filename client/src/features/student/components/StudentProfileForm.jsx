@@ -18,6 +18,8 @@ const StudentProfileForm = ({ userId, userEmail, initialData = null, onCancel, o
         email: userEmail || '', 
         phone_number: '',
         date_of_birth: '',
+        gender: '',
+        address: '',
         guardian_name: '',
         guardian_phone: ''
     });
@@ -42,6 +44,8 @@ const StudentProfileForm = ({ userId, userEmail, initialData = null, onCancel, o
                 email: initialData.email || userEmail || '',
                 phone_number: initialData.phone_number || '',
                 date_of_birth: formattedDate || '',
+                gender: initialData.gender || '',
+                address: initialData.address || '',
                 guardian_name: initialData.guardian_name || '',
                 guardian_phone: initialData.guardian_phone || ''
             });
@@ -149,6 +153,24 @@ const StudentProfileForm = ({ userId, userEmail, initialData = null, onCancel, o
                         />
                     </div>
                     <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                        <select 
+                            name="gender" 
+                            required
+                            value={formData.gender} 
+                            onChange={handleInputChange} 
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all bg-white" 
+                        >
+                            <option value="">Select Gender</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
                         <input 
                             type="date" 
@@ -157,6 +179,17 @@ const StudentProfileForm = ({ userId, userEmail, initialData = null, onCancel, o
                             value={formData.date_of_birth} 
                             onChange={handleInputChange} 
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all" 
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                        <input 
+                            type="text" 
+                            name="address" 
+                            value={formData.address} 
+                            onChange={handleInputChange} 
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all" 
+                            placeholder="Full Address" 
                         />
                     </div>
                 </div>

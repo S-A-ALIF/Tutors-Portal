@@ -60,7 +60,7 @@ const ProfilePage = () => {
         return (
             <div className="flex justify-between items-start py-3 border-b border-gray-100 last:border-0">
                 <span className="text-gray-500 font-medium text-sm w-1/3">{label}</span>
-                <span className="text-gray-900 text-sm text-right font-medium w-2/3 break-words">
+                <span className="text-gray-900 text-sm text-right font-medium w-2/3 break-words capitalize">
                     {displayValue}
                 </span>
             </div>
@@ -137,6 +137,7 @@ const ProfilePage = () => {
                                     <InstitutionProfileForm 
                                         userId={user_info.id}
                                         userEmail={user_info.email}
+                                        userRole={user_info.role}
                                         initialData={profileData} 
                                         onCancel={() => setIsEditingProfile(false)} 
                                         onSuccess={() => setIsEditingProfile(false)} 
@@ -208,6 +209,7 @@ const ProfilePage = () => {
                                 ) : (
                                     <TutorProfileForm 
                                         userId={user_info.id}
+                                        userRole={user_info.role}
                                         userEmail={user_info.email}
                                         initialData={profileData} 
                                         onCancel={() => setIsEditingProfile(false)} 
@@ -248,8 +250,10 @@ const ProfilePage = () => {
                                 <div className="p-6">
                                     <InfoRow label="First Name" value={profileData.first_name} />
                                     <InfoRow label="Last Name" value={profileData.last_name} />
+                                    <InfoRow label="Gender" value={profileData.gender} />
                                     <InfoRow label="Phone" value={profileData.phone_number} />
                                     <InfoRow label="Date of Birth" value={formatDate(profileData.date_of_birth)} />
+                                    <InfoRow label="Address" value={profileData.address} />
                                     <InfoRow label="Guardian Name" value={profileData.guardian_name} />
                                     <InfoRow label="Guardian Phone" value={profileData.guardian_phone} />
                                 </div>

@@ -37,7 +37,8 @@ export const getOne = async (req: Request, res: Response, next: NextFunction) =>
 
 export const updateOne = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const tutor = await tutorService.updateTutor(req.params.id, req.body);
+        const sanitizedData = sanitizeTutor(req.body, true);
+        const tutor = await tutorService.updateTutor(req.params.id, sanitizedData);
         res.status(200).json({ status: 'success', message: 'Tutor updated successfully', data: tutor });
     } catch (error) { 
         next(error); 

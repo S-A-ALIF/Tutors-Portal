@@ -9,7 +9,12 @@ export interface Institution {
     phone_number: string;
     address: string | null;
     logo_url: string | null;
-    is_active: boolean;
-    user_id?: string; // Foreign key to link to the User
     created_at?: Date;
+}
+
+/**
+ * Extended interface for creation payload involving junction tables
+ */
+export interface InstitutionCreationPayload extends Institution {
+    user_id: string;
 }
