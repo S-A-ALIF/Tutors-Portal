@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useCreateInstitution, useUpdateInstitution } from '../hooks/institutionHooks';
-import { useAuth } from '../../../context/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 
 const InstitutionProfileForm = ({ userId, userEmail, initialData = null, onCancel, onSuccess }) => {
-    const { updateUser } = useAuth();
+    const queryClient = useQueryClient();
     
     // Initialize React Query Mutations
     const { mutateAsync: createInstitution, isPending: isCreating } = useCreateInstitution();
@@ -62,7 +62,7 @@ const InstitutionProfileForm = ({ userId, userEmail, initialData = null, onCance
 
             // Update the global AuthContext so the UI instantly reflects the new/updated institution
             if (profileData) {
-                 updateUser(profileData); 
+                 queryClient.invalidateQueries({ queryKey: ['userProfile', userId] });
             }
             
             // Trigger parent callback (e.g., to close the form/modal)

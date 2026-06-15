@@ -30,7 +30,11 @@ const router = createBrowserRouter([
             element: <Layout />,
             children: protectedPages.map((page) => ({
               path: page.path,
-              element: <page.component />,
+              element: (
+                  <ProtectedRoute allowedRoles={page.allowedRoles}>
+                      <page.component />
+                  </ProtectedRoute>
+              ),
             })),
           },
         ],

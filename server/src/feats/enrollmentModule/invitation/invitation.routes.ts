@@ -27,4 +27,7 @@ router.post(
     invitationController.verifyInvitation
 );
 
+router.get('/pending/:email', validateRequest(invitationSchema.pending), invitationController.getPendingInvitations);
+router.post('/reject', validateRequest(invitationSchema.reject), invitationController.rejectInvitation);
+
 export default router;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import NotificationDropdown from './NotificationDropdown';
 
 const Topbar = () => {
   return (
@@ -17,12 +18,7 @@ const Topbar = () => {
           Sunrise Academy
         </div>
         
-        <div className="w-[34px] h-[34px] rounded-[8px] bg-[#f0f0f8] flex items-center justify-center cursor-pointer border border-[rgba(60,60,120,0.10)] relative">
-          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
-          </svg>
-          <div className="w-[7px] h-[7px] bg-[#e8590c] rounded-full absolute top-[7px] right-[7px] border-[1.5px] border-white"></div>
-        </div>
+        <NotificationDropdown />
 
         {/* Profile Link */}
         <Link 

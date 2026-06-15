@@ -41,3 +41,36 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         next(error);
     }
 };
+
+import { verifyToken } from '../../config/jwt.config';
+
+export const getMe = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+        }
+        
+        const token = authHeader.split(' ')[1];
+        const decoded = verifyToken(token);
+        
+        const userId = decoded?.id;
+        const role = decoded?.role;
+
+        if (!userId || !role) {
+            return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+        }
+
+        const profile = await authService.getMe(userId, role);
+
+        res.status(200).json({
+            status: 'success',
+            data: profile
+        });
+    } catch (error: any) {
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+             return res.status(401).json({ status: 'error', message: 'Invalid token' });
+        }
+        next(error);
+    }
+};

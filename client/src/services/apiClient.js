@@ -20,8 +20,20 @@ const apiClient = axios.create({
  */
 apiClient.interceptors.request.use(
     (config) => {
-        // You can add logic here to fetch tokens from local storage 
-        // if your security requirements change.
+        try {
+            const storedUser = localStorage.getItem('user');
+            if (storedUser && storedUser !== 'undefined' && storedUser !== 'null') {
+                const userObj = JSON.parse(storedUser);
+                // Extract token from either the root or the data property based on how Axios wraps it
+                const token = userObj.token || userObj.data?.token;
+                
+                if (token) {
+                    config.headers.Authorization = `Bearer ${token}`;
+                }
+            }
+        } catch (e) {
+            console.error("DEBUG: Failed to parse user token for request", e);
+        }
         return config;
     },
     (error) => Promise.reject(error)

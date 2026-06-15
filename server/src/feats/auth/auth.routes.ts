@@ -27,4 +27,14 @@ router.post(
     authController.login
 );
 
+/**
+ * @route   GET /api/v1/auth/me
+ * @desc    Get current user
+ * @access  Private
+ */
+router.get(
+    '/me',
+    authController.getMe
+);
+
 export default router;

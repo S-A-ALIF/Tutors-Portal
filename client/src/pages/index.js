@@ -19,111 +19,137 @@ import AllResults from "./AllResultsPage";
 import ProfilePage from "./ProfilePage";
 import NotificationPage from "./NotificationPage";
 import TutorDashboard from "./TutorDashboard";
+import StudentFeesPage from "./StudentFeesPage";
 
 export const pages = [
-    {
-      path: "login",
-      component: LoginPage,
-      isProtected: false,
-    },
-    {
-      path: "signup",
-      component: SignupPage,
-      isProtected: false,
-    },
+  {
+    path: "login",
+    component: LoginPage,
+    isProtected: false,
+  },
+  {
+    path: "signup",
+    component: SignupPage,
+    isProtected: false,
+  },
   {
     path: "dashboard",
     component: Dashboard,
     isProtected: true,
+    allowedRoles: ['admin'],
   },
   {
     path: "student-dashboard",
     component: StudentDashboard,
     isProtected: true,
-  },
-  {
-    path: "examinations",
-    component: Examinations,
-    isProtected: true,
-  },
-  {
-    path: "fee-collection",
-    component: FeeCollection,
-    isProtected: true,
-  },
-  {
-    path: "payroll",
-    component: PayRoll,
-    isProtected: true,
-  },
-  {
-    path: "routines",
-    component: Routine,
-    isProtected: true,
-  },
-  {
-    path: "settings",
-    component: Settings,
-    isProtected: true,
-  },
-  {
-    path: "students",
-    component: Students,
-    isProtected: true,
-  },
-  {
-    path: "tutors",
-    component: Tutors,
-    isProtected: true,
-  },
-  {
-    path: "enroll-student",
-    component: EnrollStudent,
-    isProtected: true,
-  },
-  {
-    path: "create-exam",
-    component: CreateExam,
-    isProtected: true,
-  },
-  {
-    path: "new-class",
-    component: NewClass,
-    isProtected: true,
-  },
-  {
-    path: "record-payment",
-    component: RecordPayment,
-    isProtected: true,
-  },
-  {
-    path: "recent-transactions",
-    component: RecentTransactions,
-    isProtected: true,
-  },
-  {
-    path: "all-results",
-    component: AllResults,
-    isProtected: true,
-  },
-  {
-    path: "profile",
-    component: ProfilePage,
-    isProtected: true,
-  },
-  {
-    path: "notifications",
-    component: NotificationPage,
-    isProtected: true,
+    allowedRoles: ['student'],
   },
   {
     path: "tutor-dashboard",
     component: TutorDashboard,
     isProtected: true,
+    allowedRoles: ['tutor'],
+  },
+  {
+    path: "my-fees",
+    component: StudentFeesPage,
+    isProtected: true,
+    allowedRoles: ['student'],
+  },
+  {
+    path: "examinations",
+    component: Examinations,
+    isProtected: true,
+    allowedRoles: ['admin', 'tutor', 'student'],
+  },
+  {
+    path: "fee-collection",
+    component: FeeCollection,
+    isProtected: true,
+    allowedRoles: ['admin'],
+  },
+  {
+    path: "payroll",
+    component: PayRoll,
+    isProtected: true,
+    allowedRoles: ['admin'],
+  },
+  {
+    path: "routines",
+    component: Routine,
+    isProtected: true,
+    allowedRoles: ['admin', 'tutor', 'student'],
+  },
+  {
+    path: "settings",
+    component: Settings,
+    isProtected: true,
+    allowedRoles: ['admin', 'tutor', 'student'],
+  },
+  {
+    path: "students",
+    component: Students,
+    isProtected: true,
+    allowedRoles: ['admin'],
+  },
+  {
+    path: "tutors",
+    component: Tutors,
+    isProtected: true,
+    allowedRoles: ['admin'],
+  },
+  {
+    path: "enroll-student",
+    component: EnrollStudent,
+    isProtected: true,
+    allowedRoles: ['admin'],
+  },
+  {
+    path: "create-exam",
+    component: CreateExam,
+    isProtected: true,
+    allowedRoles: ['admin'],
+  },
+  {
+    path: "new-class",
+    component: NewClass,
+    isProtected: true,
+    allowedRoles: ['admin'],
+  },
+  {
+    path: "record-payment",
+    component: RecordPayment,
+    isProtected: true,
+    allowedRoles: ['admin'],
+  },
+  {
+    path: "recent-transactions",
+    component: RecentTransactions,
+    isProtected: true,
+    allowedRoles: ['admin'],
+  },
+  {
+    path: "all-results",
+    component: AllResults,
+    isProtected: true,
+    allowedRoles: ['admin', 'tutor', 'student'],
+  },
+  {
+    path: "profile",
+    component: ProfilePage,
+    isProtected: true,
+    allowedRoles: ['admin', 'tutor', 'student'],
+  },
+  {
+    path: "notifications",
+    component: NotificationPage,
+    isProtected: true,
+    allowedRoles: ['admin', 'tutor', 'student'],
   },
   {
     path: "accept-invitation",
     component: AcceptInvitationPage,
     isProtected: true,
+    allowedRoles: ['tutor', 'student'],
   }
 ];

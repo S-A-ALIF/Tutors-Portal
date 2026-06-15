@@ -33,3 +33,29 @@ export const verifyInvitation = async (req: Request, res: Response, next: NextFu
         next(error);
     }
 };
+
+export const getPendingInvitations = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { email } = req.params;
+        const result = await invitationService.getPendingInvitations(email);
+        res.status(200).json({
+            status: 'success',
+            data: result
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const rejectInvitation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { id, email } = req.body;
+        await invitationService.rejectInvitation(id, email);
+        res.status(200).json({
+            status: 'success',
+            message: 'Invitation rejected successfully'
+        });
+    } catch (error) {
+        next(error);
+    }
+};

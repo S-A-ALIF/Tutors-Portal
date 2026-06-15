@@ -1,5 +1,5 @@
-import { useMutation } from '@tanstack/react-query';
-import { sendInvitation, verifyInvitation } from '../services/invitationService';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { sendInvitation, verifyInvitation, getPendingInvitations, rejectInvitation } from '../services/invitationService';
 import { toast } from 'sonner';
 
 export const useSendInvitation = () => {
@@ -22,6 +22,24 @@ export const useVerifyInvitation = () => {
         },
         onError: (error) => {
             toast.error(error.message || "Failed to verify invitation.");
+        }
+    });
+};
+
+export const usePendingInvitations = (email) => {
+    return useQuery({
+        queryKey: ['invitations', 'pending', email],
+        queryFn: () => getPendingInvitations(email),
+        enabled: !!email
+    });
+};
+
+export const useRejectInvitation = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: rejectInvitation,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['invitations', 'pending'] });
         }
     });
 };

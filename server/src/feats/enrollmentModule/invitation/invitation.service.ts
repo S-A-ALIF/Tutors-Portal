@@ -197,3 +197,37 @@ export const verifyInvitation = async (code: string, user_id: string): Promise<a
         client.release();
     }
 };
+
+export const getPendingInvitations = async (email: string): Promise<any[]> => {
+    const query = `
+        SELECT i.id, i.inst_id, i.email, i.expires_at, i.status, i.role, i.academic_year, i.grade, inst.name as institution_name
+        FROM invitations i
+        JOIN institutions inst ON i.inst_id = inst.id
+        WHERE i.email = $1 AND i.status = 'pending'
+    `;
+    try {
+        const result = await pool.query(query, [email]);
+        return result.rows;
+    } catch (error) {
+        console.error('Service Error [getPendingInvitations]:', error);
+        throw new CustomError('Failed to fetch invitations', 500);
+    }
+};
+
+export const rejectInvitation = async (id: string, email: string): Promise<void> => {
+    const query = `
+        UPDATE invitations 
+        SET status = 'rejected' 
+        WHERE id = $1 AND email = $2 AND status = 'pending'
+    `;
+    try {
+        const result = await pool.query(query, [id, email]);
+        if (result.rowCount === 0) {
+            throw new CustomError('Invitation not found or already processed', 404);
+        }
+    } catch (error: any) {
+        if (error instanceof CustomError) throw error;
+        console.error('Service Error [rejectInvitation]:', error);
+        throw new CustomError('Failed to reject invitation', 500);
+    }
+};

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../features/authentication/services/authServices';
+import { useQuery } from '@tanstack/react-query';
 
 const AuthContext = createContext();
 
@@ -68,39 +69,26 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('user');
     };
 
-    // Update user state dynamically (e.g., after profile creation)
-    const updateUser = (newProfileData) => {
-        setUser((prevUser) => {
-            if (!prevUser) return prevUser;
-            
-            // Clone the previous state so we can mutate it safely
-            let updatedUser = { ...prevUser };
+    // Use TanStack Query to fetch profile automatically
+    const userId = user?.data?.id || user?.id;
 
-            // FIX: Check if the user object has a nested '.data' property (Axios wrapper)
-            if (updatedUser.data) {
-                updatedUser.data = {
-                    ...updatedUser.data,
-                    profile: {
-                        ...(updatedUser.data.profile || {}),
-                        ...newProfileData
-                    }
-                };
-            } else {
-                // Fallback for flat structure
-                updatedUser = {
-                    ...updatedUser,
-                    profile: {
-                        ...(updatedUser.profile || {}),
-                        ...newProfileData
-                    }
-                };
-            }
-            
-            console.log("DEBUG: Context updated with new profile:", updatedUser);
-            localStorage.setItem('user', JSON.stringify(updatedUser));
-            return updatedUser;
-        });
-    };
+    const { data: fetchedProfileResponse } = useQuery({
+        queryKey: ['userProfile', userId],
+        queryFn: authService.getMe,
+        enabled: !!userId,
+    });
+
+    const actualProfile = fetchedProfileResponse?.data ? fetchedProfileResponse.data : fetchedProfileResponse;
+
+    // Dynamically merge the fetched profile into the user object
+    const fullUser = user ? {
+        ...user,
+        data: user.data ? { 
+            ...user.data, 
+            profile: actualProfile !== undefined ? actualProfile : user.data.profile 
+        } : undefined,
+        profile: !user.data ? (actualProfile !== undefined ? actualProfile : user.profile) : undefined
+    } : null;
 
     // Prevent protected routes from kicking the user out before storage is checked
     if (isInitializing) {
@@ -108,7 +96,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     return (
-        <AuthContext.Provider value={{ user, login, signup, logout, updateUser, loading }}>
+        <AuthContext.Provider value={{ user: fullUser, login, signup, logout, loading }}>
             {children}
         </AuthContext.Provider>
     );

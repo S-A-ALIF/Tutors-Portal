@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useCreateStudent, useUpdateStudent } from '../hooks/studentHooks';
-import { useAuth } from '../../../context/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 
 const StudentProfileForm = ({ userId, userEmail, initialData = null, onCancel, onSuccess }) => {
-    const { updateUser } = useAuth();
+    const queryClient = useQueryClient();
     
     // Initialize React Query Mutations
     const { mutateAsync: createStudent, isPending: isCreating } = useCreateStudent();
@@ -27,7 +27,6 @@ const StudentProfileForm = ({ userId, userEmail, initialData = null, onCancel, o
     // Populate form if we are in edit mode, or just set the email if creating
     useEffect(() => {
         if (initialData && Object.keys(initialData).length > 0) {
-            
             // Format date for HTML date input (YYYY-MM-DD)
             let formattedDate = '';
             if (initialData.date_of_birth) {
@@ -63,25 +62,33 @@ const StudentProfileForm = ({ userId, userEmail, initialData = null, onCancel, o
         
         try {
             let responseData;
-            const payload = {
-                ...formData,
-                user_id: userId
-            };
             
+            // Format dates before sending
+            const dataToSubmit = { ...formData };
+            if (dataToSubmit.date_of_birth === '') {
+                delete dataToSubmit.date_of_birth; // Prevent empty string validation errors for dates
+            }
+
             if (isEditMode) {
-                responseData = await updateStudent({ id: initialData.id, data: payload });
+                // IMPORTANT: Make sure this matches your hook's expected format (e.g., passing id and data as one object if needed)
+                responseData = await updateStudent({ id: initialData.id, data: dataToSubmit });
             } else {
+                // IMPORTANT: Inject the user_id into the payload for backend foreign key mapping
+                const payload = {
+                    ...dataToSubmit,
+                    user_id: userId 
+                };
                 responseData = await createStudent(payload);
             }
 
-            console.log("DEBUG: Raw Response from API after saving Student:", responseData);
+            console.log("DEBUG: Raw Response from API after saving student profile:", responseData);
 
-            // Extract the actual data payload
+            // Extract the actual data payload (handles Axios wrapper if present)
             const profileData = responseData?.data ? responseData.data : responseData;
 
-            // Update global auth state
+            // Update the global AuthContext via TanStack query
             if (profileData) {
-                 updateUser(profileData); 
+                 queryClient.invalidateQueries({ queryKey: ['userProfile', userId] });
             }
             
             if (onSuccess) onSuccess(profileData);

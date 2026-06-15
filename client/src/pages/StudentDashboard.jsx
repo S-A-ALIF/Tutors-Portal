@@ -8,17 +8,6 @@ const StudentDashboard = () => {
                 <p className="text-gray-600 mb-8">
                     Welcome to the student portal.
                 </p>
-                
-                <div className="p-6 bg-purple-50 rounded-lg border border-purple-100 max-w-md mx-auto">
-                    <h3 className="text-xl font-bold text-purple-800 mb-2">Have an Invitation Code?</h3>
-                    <p className="text-sm text-purple-600 mb-4">Enter the 6-digit code sent to your email to join an institution.</p>
-                    <Link 
-                        to="/accept-invitation" 
-                        className="inline-block bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-6 rounded-lg transition-colors"
-                    >
-                        Enter Code
-                    </Link>
-                </div>
             </div>
         </div>
     );

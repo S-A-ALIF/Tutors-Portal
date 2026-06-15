@@ -27,4 +27,15 @@ export const invitationSchema = {
             user_id: z.string().uuid("User ID is required"),
         }),
     }),
+    pending: z.object({
+        params: z.object({
+            email: z.string().email("Invalid email format"),
+        }),
+    }),
+    reject: z.object({
+        body: z.object({
+            id: z.string().uuid("Invalid invitation ID"),
+            email: z.string().email("Invalid email format"),
+        }),
+    }),
 };

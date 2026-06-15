@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useCreateTutor, useUpdateTutor } from '../hooks/tutorHooks';
-import { useAuth } from '../../../context/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 
 const TutorProfileForm = ({ userId, userRole,userEmail, initialData = null, onCancel, onSuccess }) => {
-    const { updateUser } = useAuth();
+    const queryClient = useQueryClient();
     
     // Initialize React Query Mutations (Ensure these match your actual hook names)
     const { mutateAsync: createTutor, isPending: isCreating } = useCreateTutor();

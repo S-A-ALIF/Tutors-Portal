@@ -56,38 +56,7 @@ export const loginUser = async (email: string, password: string) => {
             throw new CustomError('Invalid email or password', 401);
         }
 
-        // 4. Fetch associated profile based on role using junction tables
-        let profile = null;
-        
-        if (user.role === 'admin') {
-            const instQuery = `
-                SELECT i.* FROM institutions i 
-                JOIN user_institutions ui ON i.id = ui.inst_id 
-                WHERE ui.user_id = $1
-            `;
-            const instResult = await pool.query(instQuery, [user.id]);
-            profile = instResult.rows[0] || null;
-            
-        } else if (user.role === 'tutor') {
-            const tutorQuery = `
-                SELECT t.* FROM tutors t 
-                JOIN user_tutors ut ON t.id = ut.tutor_id 
-                WHERE ut.user_id = $1
-            `;
-            const tutorResult = await pool.query(tutorQuery, [user.id]);
-            profile = tutorResult.rows[0] || null;
-            
-        } else if (user.role === 'student') {
-            const studentQuery = `
-                SELECT s.* FROM students s 
-                JOIN user_students us ON s.id = us.student_id 
-                WHERE us.user_id = $1
-            `;
-            const studentResult = await pool.query(studentQuery, [user.id]);
-            profile = studentResult.rows[0] || null;
-        }
-
-        // 5. Generate JWT
+        // 4. Generate JWT
         const token = generateToken({ id: user.id, role: user.role });
 
         return {
@@ -96,7 +65,7 @@ export const loginUser = async (email: string, password: string) => {
                 id: user.id,
                 email: user.email,
                 role: user.role,
-                profile // Automatically contains institution, tutor, or student data (or null if not created yet)
+                // Profile will now be fetched dynamically via /me endpoint
             }
         };
     } catch (error: any) {
@@ -104,5 +73,45 @@ export const loginUser = async (email: string, password: string) => {
         
         console.error('Service Error [loginUser]:', error);
         throw new CustomError('Database operation failed during login', 500);
+    }
+};
+
+export const getMe = async (userId: string, role: string) => {
+    try {
+        let profile = null;
+        
+        if (role === 'admin') {
+            const instQuery = `
+                SELECT i.* FROM institutions i 
+                JOIN user_institutions ui ON i.id = ui.inst_id 
+                WHERE ui.user_id = $1
+            `;
+            const instResult = await pool.query(instQuery, [userId]);
+            profile = instResult.rows[0] || null;
+            
+        } else if (role === 'tutor') {
+            const tutorQuery = `
+                SELECT t.* FROM tutors t 
+                JOIN user_tutors ut ON t.id = ut.tutor_id 
+                WHERE ut.user_id = $1
+            `;
+            const tutorResult = await pool.query(tutorQuery, [userId]);
+            profile = tutorResult.rows[0] || null;
+            
+        } else if (role === 'student') {
+            const studentQuery = `
+                SELECT s.* FROM students s 
+                JOIN user_students us ON s.id = us.student_id 
+                WHERE us.user_id = $1
+            `;
+            const studentResult = await pool.query(studentQuery, [userId]);
+            profile = studentResult.rows[0] || null;
+        }
+
+        return profile;
+    } catch (error: any) {
+        if (error instanceof CustomError) throw error;
+        console.error('Service Error [getMe]:', error);
+        throw new CustomError('Failed to fetch user profile', 500);
     }
 };
