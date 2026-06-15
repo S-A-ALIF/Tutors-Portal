@@ -6,6 +6,7 @@ export interface Enrollment {
     id: string;
     academic_year: string;
     grade: string;
+    department?: string | null;
     section: string | null;
     roll_no: string | null;
     monthly_fee: number | null;

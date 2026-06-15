@@ -25,6 +25,7 @@ const EnrollmentForm = ({ instId, onCancel, onSuccess }) => {
         guardian_phone: '',
         academic_year: defaultAcademicYear,
         grade: '',
+        department: '',
         section: '',
         roll_no: '',
         monthly_fee: '',
@@ -52,6 +53,7 @@ const EnrollmentForm = ({ instId, onCancel, onSuccess }) => {
                     email: formData.email,
                     academic_year: formData.academic_year,
                     grade: formData.grade,
+                    department: formData.department,
                     section: formData.section,
                     roll_no: formData.roll_no,
                     monthly_fee: formData.monthly_fee ? Number(formData.monthly_fee) : null,
@@ -194,7 +196,8 @@ const EnrollmentForm = ({ instId, onCancel, onSuccess }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormInputField label="Academic Year" name="academic_year" value={formData.academic_year} onChange={handleInputChange} required placeholder="2023-2024" />
                         <FormInputField label="Grade/Class" name="grade" value={formData.grade} onChange={handleInputChange} required placeholder="10th Grade" />
-                        <FormInputField label="Section (Optional)" name="section" value={formData.section} onChange={handleInputChange} placeholder="A" />
+                        <FormInputField label="Department/Group" name="department" value={formData.department} onChange={handleInputChange} placeholder="Science (Optional)" />
+                        <FormInputField label="Section" name="section" value={formData.section} onChange={handleInputChange} placeholder="A (Optional)" />
                         
                         <FormInputField label="Roll Number (Optional)" name="roll_no" value={formData.roll_no} onChange={handleInputChange} placeholder="101" />
                         <FormInputField label="Monthly Fee (Optional)" name="monthly_fee" type="number" value={formData.monthly_fee} onChange={handleInputChange} placeholder="0.00" />

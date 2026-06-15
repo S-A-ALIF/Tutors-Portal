@@ -59,6 +59,7 @@ const Sidebar = () => {
         <>
           <NavItem path="/students" label="Students" count={studentsCount} icon={Users} />
           <NavItem path="/tutors" label="Tutors" count={tutorsCount} icon={User} />
+          <NavItem path="/classes" label="Classes" icon={BookOpen} />
         </>
       )}
 

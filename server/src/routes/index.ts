@@ -8,6 +8,8 @@ import { enrollmentRoutes } from '../feats/enrollmentModule/enrollment';
 import invitationRoutes from '../feats/enrollmentModule/invitation/invitation.routes';
 import { emailRoutes } from '../feats/email';
 import examRoutes from '../feats/examModule/exam/exam.routes';
+import classRoutes from '../feats/classModule/class/class.routes';
+import routineRoutes from '../feats/routineModule/routine/routine.routes';
 
 const router = Router();
 
@@ -23,5 +25,7 @@ router.use('/enrollments', enrollmentRoutes);
 router.use('/invitations', invitationRoutes);
 router.use('/send-emails', emailRoutes);
 router.use('/exams', examRoutes);
+router.use('/classes', classRoutes);
+router.use('/routines', routineRoutes);
 
 export default router;

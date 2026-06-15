@@ -4,7 +4,7 @@ import { CustomError } from '../../../error/customErrors';
 import { EnrollmentDetails } from './enrollment.model';
 
 export const createEnrollment = async (enrollmentData: any): Promise<EnrollmentDetails> => {
-    const { student_id, inst_id, academic_year, grade, section, roll_no, monthly_fee, status } = enrollmentData;
+    const { student_id, inst_id, academic_year, grade, department, section, roll_no, monthly_fee, status } = enrollmentData;
 
     const client = await pool.connect();
     try {
@@ -35,8 +35,8 @@ export const createEnrollment = async (enrollmentData: any): Promise<EnrollmentD
         
         // 1. Insert into core enrollments table
         const enrollmentQuery = `
-            INSERT INTO enrollments (id, academic_year, grade, section, roll_no, monthly_fee) 
-            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+            INSERT INTO enrollments (id, academic_year, grade, department, section, roll_no, monthly_fee) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
         `;
         
         // CRITICAL FIX: The pg driver crashes if given 'undefined'. We must fallback to 'null'.
@@ -44,6 +44,7 @@ export const createEnrollment = async (enrollmentData: any): Promise<EnrollmentD
             id, 
             academic_year, 
             grade, 
+            department || null,
             section || null, 
             roll_no || null, 
             monthly_fee ?? null // Use ?? to allow a fee of 0

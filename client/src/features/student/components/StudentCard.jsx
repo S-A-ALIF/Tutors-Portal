@@ -8,6 +8,7 @@ const StudentCard = ({ student, onEdit, onDelete }) => {
         last_name, 
         grade_level,
         class_grade, 
+        department,
         section,
         roll_no,
         school_name,
@@ -46,6 +47,7 @@ const StudentCard = ({ student, onEdit, onDelete }) => {
                         <div className="mt-2 space-y-1">
                             <p className="text-sm text-gray-700 font-semibold">
                                 {displayGrade ? `Grade: ${displayGrade}` : 'Grade unassigned'}
+                                {department ? ` • Dept: ${department}` : ''}
                                 {section ? ` • Sec: ${section}` : ''}
                                 {roll_no ? ` • Roll: ${roll_no}` : ''}
                             </p>

@@ -13,6 +13,7 @@ import EnrollStudent from "./EnrollStudentPage";
 import AcceptInvitationPage from "./AcceptInvitationPage";
 import CreateExam from "./CreateExamPage";
 import NewClass from "./NewClassPage";
+import ClassesPage from "./ClassesPage";
 import RecordPayment from "./RecordPaymentPage";
 import RecentTransactions from "./RecentTransactionsPage";
 import AllResults from "./AllResultsPage";
@@ -113,6 +114,12 @@ export const pages = [
   {
     path: "new-class",
     component: NewClass,
+    isProtected: true,
+    allowedRoles: ['admin'],
+  },
+  {
+    path: "classes",
+    component: ClassesPage,
     isProtected: true,
     allowedRoles: ['admin'],
   },
