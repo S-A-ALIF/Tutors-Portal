@@ -9,7 +9,8 @@ const TutorProfileForm = ({ userId, userRole,userEmail, initialData = null, onCa
     const { mutateAsync: createTutor, isPending: isCreating } = useCreateTutor();
     const { mutateAsync: updateTutor, isPending: isUpdating } = useUpdateTutor();
     
-    const isEditMode = !!initialData;
+    // Check if initialData is actually populated (has an id)
+    const isEditMode = initialData && Object.keys(initialData).length > 0 && !!initialData.id;
     const isSubmitting = isCreating || isUpdating;
 
     const [formData, setFormData] = useState({
@@ -67,9 +68,9 @@ const TutorProfileForm = ({ userId, userRole,userEmail, initialData = null, onCa
             // Extract the actual data payload
             const profileData = responseData?.data ? responseData.data : responseData;
 
-            // Update global auth state
+            // Invalidate userProfile query to refetch globally
             if (profileData) {
-                 updateUser(profileData); 
+                 queryClient.invalidateQueries({ queryKey: ['userProfile'] }); 
             }
             
             if (onSuccess) onSuccess(profileData);

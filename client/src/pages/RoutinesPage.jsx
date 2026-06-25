@@ -28,9 +28,15 @@ const RoutinesPage = () => {
         <div className="p-6 max-w-[1400px] mx-auto h-full flex flex-col">
             <h1 className="text-2xl font-bold text-gray-900 mb-6">Routine Management</h1>
             {periods.length === 0 ? (
-                <SetupPhase instId={instId} />
+                role === 'admin' ? (
+                    <SetupPhase instId={instId} />
+                ) : (
+                    <div className="text-center text-gray-500 py-16 bg-white rounded-xl shadow-sm border border-gray-200">
+                        <p className="text-lg font-medium">Routine schedule has not been set up yet by the administrator.</p>
+                    </div>
+                )
             ) : (
-                <GridPhase instId={instId} periods={periods} />
+                <GridPhase instId={instId} periods={periods} role={role} />
             )}
         </div>
     );
@@ -124,7 +130,7 @@ const SetupPhase = ({ instId }) => {
     );
 };
 
-const GridPhase = ({ instId, periods }) => {
+const GridPhase = ({ instId, periods, role }) => {
     const [activeDay, setActiveDay] = useState(DAYS_OF_WEEK[0]);
     const { data: classesResponse } = useClasses(instId);
     const { data: routineSlots } = useRoutine(instId, activeDay);
@@ -136,6 +142,11 @@ const GridPhase = ({ instId, periods }) => {
 
     const getSlot = (classId, periodId) => {
         return slots.find(s => s.class_id === classId && s.period_id === periodId);
+    };
+
+    const handleCellClick = (cls, p, slot) => {
+        if (role !== 'admin') return;
+        setEditingCell({ class_id: cls.id, period_id: p.id, slot });
     };
 
     return (
@@ -186,8 +197,8 @@ const GridPhase = ({ instId, periods }) => {
                                         return (
                                             <td 
                                                 key={p.id} 
-                                                onClick={() => setEditingCell({ class_id: cls.id, period_id: p.id, slot })}
-                                                className="p-2 border-r border-gray-200 cursor-pointer hover:bg-blue-50/50 transition-colors text-center relative group"
+                                                onClick={() => handleCellClick(cls, p, slot)}
+                                                className={`p-2 border-r border-gray-200 text-center relative group ${role === 'admin' ? 'cursor-pointer hover:bg-blue-50/50 transition-colors' : ''}`}
                                             >
                                                 {slot && (slot.subject || slot.tutor_id) ? (
                                                     <div className="flex flex-col items-center justify-center h-full min-h-[60px] p-2 rounded-md bg-blue-50 border border-blue-100">
@@ -199,8 +210,8 @@ const GridPhase = ({ instId, periods }) => {
                                                         )}
                                                     </div>
                                                 ) : (
-                                                    <div className="min-h-[60px] flex items-center justify-center text-gray-300 group-hover:text-blue-300 transition-colors">
-                                                        <span className="text-2xl">+</span>
+                                                    <div className={`min-h-[60px] flex items-center justify-center text-gray-300 transition-colors ${role === 'admin' ? 'group-hover:text-blue-300' : ''}`}>
+                                                        <span className="text-2xl">{role === 'admin' ? '+' : '-'}</span>
                                                     </div>
                                                 )}
                                             </td>

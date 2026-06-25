@@ -15,10 +15,13 @@ export const useSendInvitation = () => {
 };
 
 export const useVerifyInvitation = () => {
+    const queryClient = useQueryClient();
     return useMutation({
         mutationFn: verifyInvitation,
         onSuccess: () => {
             toast.success("Invitation verified and enrollment successful!");
+            queryClient.invalidateQueries({ queryKey: ['userProfile'] });
+            queryClient.invalidateQueries({ queryKey: ['invitations', 'pending'] });
         },
         onError: (error) => {
             toast.error(error.message || "Failed to verify invitation.");

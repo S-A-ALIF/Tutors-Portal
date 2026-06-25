@@ -44,17 +44,21 @@ export const AuthProvider = ({ children }) => {
     const login = async (credentials) => {
         setLoading(true);
         try {
-            const userData = await authService.login(credentials);
+            const response = await authService.login(credentials);
             
-            if (userData) {
-                setUser(userData);
-                // Ensure data survives a refresh
-                localStorage.setItem('user', JSON.stringify(userData));
+            if (response && response.data) {
+                // response is { status: 'success', token: '...', data: { id, email, role } }
+                const normalizedUser = {
+                    ...response.data,
+                    token: response.token
+                };
+                setUser(normalizedUser);
+                localStorage.setItem('user', JSON.stringify(normalizedUser));
+                return normalizedUser;
             } else {
                 console.error("DEBUG: authService.login returned undefined or null");
+                return null;
             }
-            
-            return userData;
         } catch (error) {
             console.error("DEBUG: Login request error:", error);
             throw error;
@@ -70,7 +74,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     // Use TanStack Query to fetch profile automatically
-    const userId = user?.data?.id || user?.id;
+    const userId = user?.id || user?.data?.user?.id || user?.data?.id;
 
     const { data: fetchedProfileResponse } = useQuery({
         queryKey: ['userProfile', userId],
@@ -83,11 +87,7 @@ export const AuthProvider = ({ children }) => {
     // Dynamically merge the fetched profile into the user object
     const fullUser = user ? {
         ...user,
-        data: user.data ? { 
-            ...user.data, 
-            profile: actualProfile !== undefined ? actualProfile : user.data.profile 
-        } : undefined,
-        profile: !user.data ? (actualProfile !== undefined ? actualProfile : user.profile) : undefined
+        profile: actualProfile !== undefined ? actualProfile : user.profile
     } : null;
 
     // Prevent protected routes from kicking the user out before storage is checked

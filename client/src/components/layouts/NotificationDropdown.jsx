@@ -5,7 +5,7 @@ import AcceptInvitationModal from '../../features/enrollment/components/AcceptIn
 
 const NotificationDropdown = () => {
     const { user } = useAuth();
-    const email = user?.email;
+    const email = user?.email || user?.data?.user?.email || user?.data?.email;
     const [isOpen, setIsOpen] = useState(false);
     const [selectedInvitation, setSelectedInvitation] = useState(null);
     const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);

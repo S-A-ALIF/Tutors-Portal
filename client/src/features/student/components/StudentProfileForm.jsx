@@ -9,7 +9,8 @@ const StudentProfileForm = ({ userId, userEmail, initialData = null, onCancel, o
     const { mutateAsync: createStudent, isPending: isCreating } = useCreateStudent();
     const { mutateAsync: updateStudent, isPending: isUpdating } = useUpdateStudent();
     
-    const isEditMode = !!initialData;
+    // Check if initialData is actually populated (has an id)
+    const isEditMode = initialData && Object.keys(initialData).length > 0 && !!initialData.id;
     const isSubmitting = isCreating || isUpdating;
 
     const [formData, setFormData] = useState({

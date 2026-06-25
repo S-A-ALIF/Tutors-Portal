@@ -8,7 +8,7 @@ const TutorsPage = () => {
     const { user } = useAuth();
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
     
-    const instId = user?.data?.inst_id || user?.inst_id || user?.data?.profile?.id || user?.id;
+    const instId = user?.profile?.id;
 
     const { data: tutorsData, isLoading, isError, error } = useTutors();
     const { mutate: deleteTutor } = useDeleteTutor();

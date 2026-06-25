@@ -21,7 +21,7 @@ export const verifyInvitation = async (data) => {
 export const getPendingInvitations = async (email) => {
     try {
         const response = await apiClient.get(`/invitations/pending/${email}`);
-        return response.data;
+        return response.data.data || [];
     } catch (error) {
         throw error.response?.data || error;
     }

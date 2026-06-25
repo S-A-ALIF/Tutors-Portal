@@ -9,7 +9,8 @@ const InstitutionProfileForm = ({ userId, userEmail, initialData = null, onCance
     const { mutateAsync: createInstitution, isPending: isCreating } = useCreateInstitution();
     const { mutateAsync: updateInstitution, isPending: isUpdating } = useUpdateInstitution();
     
-    const isEditMode = !!initialData;
+    // Check if initialData is actually populated (has an id)
+    const isEditMode = initialData && Object.keys(initialData).length > 0 && !!initialData.id;
     const isSubmitting = isCreating || isUpdating;
 
     const [formData, setFormData] = useState({

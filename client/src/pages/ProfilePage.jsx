@@ -74,23 +74,11 @@ const ProfilePage = () => {
                 <p className="text-gray-500 mt-1 capitalize">Logged in as: <strong>{role}</strong></p>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            <div className="max-w-4xl space-y-8">
                 
                 {/* ================= ADMIN SECTIONS ================= */}
                 {role === 'admin' && (
                     <>
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-fit">
-                            <div className="bg-blue-50 px-6 py-4 border-b border-gray-200">
-                                <h2 className="text-lg font-semibold text-blue-800">Admin User Info</h2>
-                            </div>
-                            <div className="p-6">
-                                <InfoRow label="User ID" value={user_info.id} />
-                                <InfoRow label="Email" value={user_info.email} />
-                                <InfoRow label="Role" value={user_info.role} />
-                                <InfoRow label="Created At" value={formatDate(user_info.createdAt || user_info.created_at)} />
-                            </div>
-                        </div>
-
                         {profileData && !isEditingProfile ? (
                             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-fit">
                                 <div className="bg-blue-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -151,18 +139,6 @@ const ProfilePage = () => {
                 {/* ================= TUTOR SECTIONS ================= */}
                 {(role === 'tutor') && (
                     <>
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-fit">
-                            <div className="bg-green-50 px-6 py-4 border-b border-gray-200">
-                                <h2 className="text-lg font-semibold text-green-800">Tutor User Info</h2>
-                            </div>
-                            <div className="p-6">
-                                <InfoRow label="User ID" value={user_info.id} />
-                                <InfoRow label="Email" value={user_info.email} />
-                                <InfoRow label="Role" value={user_info.role} />
-                                <InfoRow label="Created At" value={formatDate(user_info.createdAt || user_info.created_at)} />
-                            </div>
-                        </div>
-
                         {profileData && !isEditingProfile ? (
                             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-fit">
                                 <div className="bg-green-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -224,18 +200,6 @@ const ProfilePage = () => {
                 {/* ================= STUDENT SECTIONS ================= */}
                 {role === 'student' && (
                     <>
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-fit">
-                            <div className="bg-purple-50 px-6 py-4 border-b border-gray-200">
-                                <h2 className="text-lg font-semibold text-purple-800">Student User Info</h2>
-                            </div>
-                            <div className="p-6">
-                                <InfoRow label="User ID" value={user_info.id} />
-                                <InfoRow label="Email" value={user_info.email} />
-                                <InfoRow label="Role" value={user_info.role} />
-                                <InfoRow label="Created At" value={formatDate(user_info.createdAt || user_info.created_at)} />
-                            </div>
-                        </div>
-
                         {profileData && !isEditingProfile ? (
                             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-fit">
                                 <div className="bg-purple-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">

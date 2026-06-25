@@ -106,14 +106,20 @@ export const linkTutorToUser = async (email: string, userId: string): Promise<bo
     }
 };
 
-export const getAllTutors = async (): Promise<TutorDetails[]> => {
-    const query = `
+export const getAllTutors = async (instId: string): Promise<TutorDetails[]> => {
+    let query = `
         SELECT t.*, ti.inst_id 
         FROM tutors t
         LEFT JOIN tutor_institutions ti ON t.id = ti.tutor_id
-        ORDER BY t.created_at DESC
     `;
-    const result = await pool.query(query);
+    const values: any[] = [];
+    if (instId) {
+        query += ` WHERE ti.inst_id = $1`;
+        values.push(instId);
+    }
+    query += ` ORDER BY t.created_at DESC`;
+    
+    const result = await pool.query(query, values);
     return result.rows;
 };
 

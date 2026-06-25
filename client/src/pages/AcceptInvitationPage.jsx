@@ -9,8 +9,8 @@ const AcceptInvitationPage = () => {
     const [code, setCode] = useState('');
     const { mutateAsync: verifyInvitation, isPending } = useVerifyInvitation();
 
-    const userRole = user?.data?.role || user?.role;
-    const studentId = user?.data?.profile?.id || user?.profile?.id || user?.data?.id || user?.id;
+    const userRole = user?.role || user?.data?.user?.role || user?.data?.role;
+    const studentId = user?.profile?.id || user?.data?.profile?.id || user?.id || user?.data?.user?.id || user?.data?.id;
 
     const handleSubmit = async (e) => {
         e.preventDefault();

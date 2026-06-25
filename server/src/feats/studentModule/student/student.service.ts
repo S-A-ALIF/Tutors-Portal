@@ -75,8 +75,8 @@ export const createStudent = async (studentData: any): Promise<StudentDetails> =
     }
 };
 
-export const getAllStudents = async (): Promise<any[]> => {
-    const query = `
+export const getAllStudents = async (instId: string): Promise<any[]> => {
+    let query = `
         SELECT 
             s.*, 
             us.user_id,
@@ -91,9 +91,15 @@ export const getAllStudents = async (): Promise<any[]> => {
         LEFT JOIN enrollments e ON se.enrollment_id = e.id
         LEFT JOIN institution_enrollments ie ON e.id = ie.enrollment_id
         LEFT JOIN institutions inst ON ie.inst_id = inst.id
-        ORDER BY s.created_at DESC
     `;
-    const result = await pool.query(query);
+    const values: any[] = [];
+    if (instId) {
+        query += ` WHERE ie.inst_id = $1`;
+        values.push(instId);
+    }
+    query += ` ORDER BY s.created_at DESC`;
+
+    const result = await pool.query(query, values);
     return result.rows;
 };
 

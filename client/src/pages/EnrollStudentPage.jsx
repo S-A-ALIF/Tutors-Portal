@@ -8,7 +8,7 @@ const EnrollmentPage = () => {
     console.log("DEBUG: Current User Data in EnrollmentPage:", user);
 
     // Safely fallback through possible nested states from your AuthContext/Store
-    const instId = user?.data?.inst_id || user?.inst_id || user?.data?.profile?.id;
+    const instId = user?.profile?.id;
 
     const handleSuccess = (data) => {
         // Navigate to the student list or profile page after successful enrollment
