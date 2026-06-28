@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useTutors, useDeleteTutor, useUpdateTutor, TutorCard } from '../features/tutor';
+import { useTutors, useDeleteTutor, useUpdateTutor, TutorCard, EditTutorModal } from '../features/tutor';
 import LoadingComponent from '../components/ui/LoadingComponent';
 import InviteTutorModal from '../features/tutor/components/InviteTutorModal';
 import { useAuth } from '../context/AuthContext';
@@ -7,12 +7,14 @@ import { useAuth } from '../context/AuthContext';
 const TutorsPage = () => {
     const { user } = useAuth();
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingTutor, setEditingTutor] = useState(null);
     
     const instId = user?.profile?.id;
 
     const { data: tutorsData, isLoading, isError, error } = useTutors();
-    const { mutate: deleteTutor } = useDeleteTutor();
-    const { mutate: updateTutor } = useUpdateTutor();
+    const { mutate: deleteTutor, isLoading: isDeleting } = useDeleteTutor();
+    const { mutate: updateTutor, isLoading: isUpdating } = useUpdateTutor();
 
     if (isLoading) {
         return <LoadingComponent message="Loading tutors..." />;
@@ -37,14 +39,28 @@ const TutorsPage = () => {
         }
     };
 
-    const handleEdit = (tutor) => {
-        const tutorId = tutor.id || tutor._id;
-        // Functional placeholder for edit: update the hourly rate
-        const newRate = window.prompt("Edit tutor's hourly rate (৳):", tutor.hourly_rate || '');
+    const handleEditClick = (tutor) => {
+        setEditingTutor(tutor);
+        setIsEditModalOpen(true);
+    };
+
+    const handleSaveTutor = (updatedData) => {
+        if (!editingTutor) return;
+        const tutorId = editingTutor.id || editingTutor._id;
         
-        if (newRate !== null && newRate !== String(tutor.hourly_rate)) {
-            updateTutor({ id: tutorId, data: { hourly_rate: Number(newRate) } });
-        }
+        updateTutor(
+            { id: tutorId, data: updatedData },
+            {
+                onSuccess: () => {
+                    setIsEditModalOpen(false);
+                    setEditingTutor(null);
+                },
+                onError: (err) => {
+                    const errorMessage = err?.message || err?.error || 'Validation Error';
+                    alert(`Server rejected the update:\n"${errorMessage}"`);
+                }
+            }
+        );
     };
 
     return (
@@ -72,7 +88,7 @@ const TutorsPage = () => {
                         <TutorCard 
                             key={tutor.id || tutor._id || Math.random()} 
                             tutor={tutor} 
-                            onEdit={handleEdit}
+                            onEdit={handleEditClick}
                             onDelete={handleDelete}
                         />
                     ))}
@@ -87,6 +103,17 @@ const TutorsPage = () => {
                     // Refetching happens via react-query in theory, but here we just alert success
                     console.log('Tutor invited successfully', data);
                 }}
+            />
+
+            <EditTutorModal 
+                isOpen={isEditModalOpen} 
+                onClose={() => {
+                    setIsEditModalOpen(false);
+                    setEditingTutor(null);
+                }} 
+                tutor={editingTutor} 
+                onSubmit={handleSaveTutor} 
+                isLoading={isUpdating} 
             />
         </div>
     );

@@ -1,11 +1,14 @@
-import React from 'react';
-import { useStudents, useDeleteStudent, useUpdateStudent, StudentCard } from '../features/student';
+import React, { useState } from 'react';
+import { useStudents, useDeleteStudent, useUpdateStudent, StudentCard, EditStudentModal } from '../features/student';
 import LoadingComponent from '../components/ui/LoadingComponent';
 
 const StudentsPage = () => {
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingStudent, setEditingStudent] = useState(null);
+
     const { data: studentsData, isLoading, isError, error } = useStudents();
-    const { mutate: deleteStudent } = useDeleteStudent();
-    const { mutate: updateStudent } = useUpdateStudent();
+    const { mutate: deleteStudent, isLoading: isDeleting } = useDeleteStudent();
+    const { mutate: updateStudent, isLoading: isUpdating } = useUpdateStudent();
 
     if (isLoading) {
         return <LoadingComponent message="Loading students..." />;
@@ -30,30 +33,28 @@ const StudentsPage = () => {
         }
     };
 
-    const handleEdit = (student) => {
-        const studentId = student.id || student._id;
-        const newName = window.prompt("Edit student's first name:", student.first_name);
-        
-        if (newName !== null && newName.trim() !== '' && newName !== student.first_name) {
-            const cleanName = newName.trim();
+    const handleEditClick = (student) => {
+        setEditingStudent(student);
+        setIsEditModalOpen(true);
+    };
 
-            // Send standard { id, data } payload to our newly fixed hook
-            updateStudent(
-                {
-                    id: studentId,
-                    data: { first_name: cleanName }
+    const handleSaveStudent = (updatedData) => {
+        if (!editingStudent) return;
+        const studentId = editingStudent.id || editingStudent._id;
+        
+        updateStudent(
+            { id: studentId, data: updatedData },
+            {
+                onSuccess: () => {
+                    setIsEditModalOpen(false);
+                    setEditingStudent(null);
                 },
-                {
-                    onSuccess: () => {
-                        console.log('Student updated successfully.');
-                    },
-                    onError: (err) => {
-                        const errorMessage = err?.message || err?.error || 'Validation Error';
-                        alert(`Server rejected the update:\n"${errorMessage}"`);
-                    }
+                onError: (err) => {
+                    const errorMessage = err?.message || err?.error || 'Validation Error';
+                    alert(`Server rejected the update:\n"${errorMessage}"`);
                 }
-            );
-        }
+            }
+        );
     };
 
     // Utility to extract a number for proper numeric sorting of grades (e.g., "Grade 10" vs "Grade 9")
@@ -121,12 +122,12 @@ const StudentsPage = () => {
                                             <h3 className="text-lg font-semibold text-purple-700 bg-purple-50 px-3 py-1.5 rounded-md inline-block">
                                                 Section: {section}
                                             </h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                            <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-4">
                                                 {sections[section].map((student) => (
                                                     <StudentCard 
                                                         key={student.id || student._id || Math.random()} 
                                                         student={student} 
-                                                        onEdit={handleEdit}
+                                                        onEdit={handleEditClick}
                                                         onDelete={handleDelete}
                                                     />
                                                 ))}
@@ -139,6 +140,17 @@ const StudentsPage = () => {
                     })}
                 </div>
             )}
+
+            <EditStudentModal 
+                isOpen={isEditModalOpen} 
+                onClose={() => {
+                    setIsEditModalOpen(false);
+                    setEditingStudent(null);
+                }} 
+                student={editingStudent} 
+                onSubmit={handleSaveStudent} 
+                isLoading={isUpdating} 
+            />
         </div>
     );
 };

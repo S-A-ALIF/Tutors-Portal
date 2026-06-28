@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useEnrollStudent } from '../hooks/enrollmentHooks';
 import { useSendInvitation } from '../hooks/invitationHooks';
+import { useClasses } from '../../class/hooks/classHooks';
 import FormInputField from '../../../components/form/FormInputField';
 
 const EnrollmentForm = ({ instId, onCancel, onSuccess }) => {
     const { mutateAsync: enrollStudent, isPending: isEnrolling, error: enrollError } = useEnrollStudent();
     const { mutateAsync: sendInvitation, isPending: isInviting, error: inviteError } = useSendInvitation();
+    const { data: classesResponse } = useClasses(instId);
+
+    const classes = classesResponse?.data || [];
+
+
 
     const [isInviteMode, setIsInviteMode] = useState(true);
 
@@ -32,11 +38,39 @@ const EnrollmentForm = ({ instId, onCancel, onSuccess }) => {
         expiry_option: '24h'
     });
 
+    const grades = useMemo(() => {
+        const uniqueGrades = [...new Set(classes.map(c => c.grade).filter(Boolean))];
+        return uniqueGrades.sort();
+    }, [classes]);
+
+    const departments = useMemo(() => {
+        if (!formData.grade) return [];
+        const uniqueDepts = [...new Set(classes.filter(c => c.grade === formData.grade && c.department).map(c => c.department))];
+        return uniqueDepts.sort();
+    }, [classes, formData.grade]);
+
+    const sections = useMemo(() => {
+        if (!formData.grade) return [];
+        let filtered = classes.filter(c => c.grade === formData.grade);
+        if (formData.department) {
+            filtered = filtered.filter(c => c.department === formData.department);
+        }
+        const uniqueSections = [...new Set(filtered.map(c => c.section).filter(Boolean))];
+        return uniqueSections.sort();
+    }, [classes, formData.grade, formData.department]);
+
     const isSubmitting = isEnrolling || isInviting;
     const activeError = isInviteMode ? inviteError : enrollError;
 
     const handleInputChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        if (name === 'grade') {
+            setFormData({ ...formData, grade: value, department: '', section: '' });
+        } else if (name === 'department') {
+            setFormData({ ...formData, department: value, section: '' });
+        } else {
+            setFormData({ ...formData, [name]: value });
+        }
     };
 
     const toggleMode = () => {
@@ -195,9 +229,48 @@ const EnrollmentForm = ({ instId, onCancel, onSuccess }) => {
                     <h4 className="text-md font-semibold text-gray-800 mb-3 border-b pb-1 mt-2">Academic Details</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormInputField label="Academic Year" name="academic_year" value={formData.academic_year} onChange={handleInputChange} required placeholder="2023-2024" />
-                        <FormInputField label="Grade/Class" name="grade" value={formData.grade} onChange={handleInputChange} required placeholder="10th Grade" />
-                        <FormInputField label="Department/Group" name="department" value={formData.department} onChange={handleInputChange} placeholder="Science (Optional)" />
-                        <FormInputField label="Section" name="section" value={formData.section} onChange={handleInputChange} placeholder="A (Optional)" />
+                        
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Grade/Class <span className="text-red-500">*</span></label>
+                            <select 
+                                name="grade" 
+                                required
+                                value={formData.grade} 
+                                onChange={handleInputChange} 
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all bg-white" 
+                            >
+                                <option value="">Select Grade</option>
+                                {grades.map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Department/Group (Optional)</label>
+                            <select 
+                                name="department" 
+                                value={formData.department} 
+                                onChange={handleInputChange} 
+                                disabled={!formData.grade || departments.length === 0}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all bg-white disabled:bg-gray-100 disabled:text-gray-400" 
+                            >
+                                <option value="">{departments.length === 0 && formData.grade ? 'No Departments' : 'Select Department'}</option>
+                                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Section (Optional)</label>
+                            <select 
+                                name="section" 
+                                value={formData.section} 
+                                onChange={handleInputChange} 
+                                disabled={!formData.grade || sections.length === 0}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all bg-white disabled:bg-gray-100 disabled:text-gray-400" 
+                            >
+                                <option value="">{sections.length === 0 && formData.grade ? 'No Sections' : 'Select Section'}</option>
+                                {sections.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
                         
                         <FormInputField label="Roll Number (Optional)" name="roll_no" value={formData.roll_no} onChange={handleInputChange} placeholder="101" />
                         <FormInputField label="Monthly Fee (Optional)" name="monthly_fee" type="number" value={formData.monthly_fee} onChange={handleInputChange} placeholder="0.00" />

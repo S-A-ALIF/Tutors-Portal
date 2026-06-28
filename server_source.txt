@@ -1,0 +1,3207 @@
+﻿
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\bootstrap\index.ts ---
+import express, { Application, Request, Response } from 'express';
+import cors from 'cors';
+import { envConfig } from '../config/env.config';
+import { pool } from '../config/db.config';
+import rootRouter from '../routes';
+import { errorHandler } from '../middlewares/errorMiddleware';
+
+const app: Application = express();
+
+// Global Middleware
+// CRITICAL: You must allow credentials (cookies/sessions) from your frontend origin
+app.use(cors({
+    origin: ["http://localhost:5173", "http://localhost:3000"], // Adjust to your frontend port
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Basic Health Check Route
+app.get('/health', async (req: Request, res: Response) => {
+    try {
+        const result = await pool.query('SELECT NOW()');
+        
+        res.status(200).json({
+            status: 'success',
+            message: 'Server is running perfectly.',
+            databaseTime: result.rows[0].now,
+        });
+    } catch (error) {
+        console.error('Database connection failed during health check:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Database connection failed.',
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+});
+
+app.use('/api/v1', rootRouter);
+app.use(errorHandler);
+
+// Start the Server
+const PORT = envConfig.port || 5000;
+
+const server = app.listen(PORT, () => {
+    console.log(`ðŸš€ Server is running on port ${PORT}`);
+    console.log(`Environment: ${envConfig.env}`);
+});
+
+// Graceful Shutdown
+const shutdown = async (signal: string) => {
+    console.log(`\nðŸ›‘ ${signal} received. Closing server...`);
+    server.close(async () => {
+        try {
+            await pool.end();
+            console.log('âœ… Database connections drained.');
+            process.exit(0);
+        } catch (err) {
+            console.error('âŒ Error during database pool shutdown:', err);
+            process.exit(1);
+        }
+    });
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+export default app;
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\config\db.config.ts ---
+import { Pool, PoolConfig } from 'pg';
+import { envConfig } from './env.config';
+
+/**
+ * Robust Pool Configuration Matrix
+ * Consumes safely parsed and validated environment schemas directly from envConfig.
+ */
+const poolConfig: PoolConfig = {
+    host: envConfig.db.host,
+    port: envConfig.db.port,
+    user: envConfig.db.user,
+    password: envConfig.db.pass,
+    database: envConfig.db.name,
+    
+    // Performance & Resource Tuning for Production Environments
+    max: 20,                          // Maximum number of active clients allowed in the pool
+    idleTimeoutMillis: 30000,         // Close idle clients after 30 seconds of inactivity
+    connectionTimeoutMillis: 2000,    // Return an error if a connection takes longer than 2 seconds
+    maxUses: 7500,                    // Recreate allocations after 7500 queries to mitigate memory leaks
+    
+    // Explicitly enforce SSL when running in a production ecosystem (e.g., Neon Postgres, AWS RDS)
+    ssl: envConfig.env === 'production' ? { rejectUnauthorized: false } : false
+};
+
+/**
+ * The unified PostgreSQL Connection Pool Instance.
+ * Shared globally across application layers to handle parallel querying efficiently.
+ */
+export const pool = new Pool(poolConfig);
+
+/**
+ * Operational Event Listeners
+ * Vital for DevOps observability, telemetry, and handling unexpected connection drops gracefully.
+ */
+pool.on('connect', () => {
+    // Log message only fires when a brand-new client allocation is instantiated inside the pool
+    if (envConfig.env === 'development') {
+        console.log('ðŸ“¦ Database Infrastructure: New client connection added to the pool.');
+    }
+});
+
+pool.on('error', (error: Error) => {
+    console.error('âŒ CRITICAL DATABASE POOL ERROR: Unexpected client failure detected.', {
+        message: error.message,
+        stack: error.stack
+    });
+});
+
+/**
+ * Graceful Shutdown Utility
+ * Ensures all pool connections drain cleanly during unexpected server restarts or SIGTERM signals.
+ */
+export const closeDatabaseConnection = async (): Promise<void> => {
+    console.log('â³ Database Infrastructure: Draining connection pool safely...');
+    try {
+        await pool.end();
+        console.log('âœ… Database Infrastructure: Connection pool closed cleanly.');
+    } catch (error) {
+        console.error('âŒ Error occurred while breaking down database connection pool:', error);
+        throw error;
+    }
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\config\env.config.ts ---
+import dotenv from 'dotenv';
+import path from 'path';
+import { z } from 'zod';
+
+// Initialize dotenv configuration before parsing the schemas
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+/**
+ * Define the strict validation schema for environment inputs.
+ * Zod coercion handles numeric casting automatically.
+ * Default values are restored to ensure seamless local development if variables are omitted.
+ */
+const envSchema = z.object({
+    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    PORT: z.coerce.number().default(5000),
+    
+    // Database Configuration Strings
+    DB_HOST: z.string().default('localhost'),
+    DB_PORT: z.coerce.number().default(5432),
+    DB_USER: z.string().default('postgres'),
+    DB_PASSWORD: z.string().default(''), 
+    DB_NAME: z.string().default('tutors_portal'),
+});
+
+// Evaluate the system environment variables against the target criteria
+const parsedEnv = envSchema.safeParse(process.env);
+
+/**
+ * Critical Fail-Fast Enforcement Block
+ * If any environment variables fail schema validation (e.g., wrong types) on startup, 
+ * kill the process immediately and return a formatted error tree.
+ */
+if (!parsedEnv.success) {
+    console.error('âŒ CRITICAL RUNTIME ERROR: Invalid system configuration variables:');
+    console.error(JSON.stringify(parsedEnv.error.format(), null, 2));
+    process.exit(1);
+}
+
+/**
+ * Export compiled configuration matrix as a frozen, immutable single-source object.
+ * The external `DB_PASSWORD` is mapped to the internal `pass` property here.
+ */
+export const envConfig = {
+    env: parsedEnv.data.NODE_ENV,
+    port: parsedEnv.data.PORT,
+    db: {
+        host: parsedEnv.data.DB_HOST,
+        port: parsedEnv.data.DB_PORT,
+        user: parsedEnv.data.DB_USER,
+        pass: parsedEnv.data.DB_PASSWORD,
+        name: parsedEnv.data.DB_NAME,
+    }
+} as const;
+
+// Export the inferred type definition for downstream interface bindings if needed
+export type EnvConfigType = typeof envConfig;
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\config\jwt.config.ts ---
+import jwt from 'jsonwebtoken';
+import { config } from 'dotenv';
+
+config(); // Load environment variables from .env file
+
+const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-in-production';
+const JWT_EXPIRES_IN = '7d';
+
+export const generateToken = (payload: object): string => {
+    return jwt.sign(payload, JWT_SECRET, {
+        expiresIn: JWT_EXPIRES_IN,
+    });
+};
+
+export const verifyToken = (token: string): any => {
+    return jwt.verify(token, JWT_SECRET);
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\error\customErrors.ts ---
+export class CustomError extends Error {
+    public readonly statusCode: number;
+
+    constructor(message: string, statusCode: number) {
+        super(message);
+        this.statusCode = statusCode;
+        
+        // This is necessary when extending built-in classes in TypeScript
+        Object.setPrototypeOf(this, new.target.prototype);
+        Error.captureStackTrace(this);
+    }
+}
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\auth\auth.controller.ts ---
+import { Request, Response, NextFunction } from 'express';
+import * as authService from './auth.service';
+import { sanitizeAuthInput } from './auth.sanitizer';
+
+export const register = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        // Sanitize the inputs before sending to service
+        const sanitizedData = sanitizeAuthInput(req.body);
+        
+        const user = await authService.registerUser(sanitizedData);
+        
+        res.status(201).json({ 
+            status: 'success', 
+            message: 'User registered successfully', 
+            data: user 
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const login = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        // Sanitize inputs
+        const { email, password } = sanitizeAuthInput(req.body);
+        
+        // Validate presence after sanitization
+        if (!email || !password) {
+            return res.status(400).json({ status: 'error', message: 'Email and password are required' });
+        }
+        
+        const authData = await authService.loginUser(email, password);
+        
+        res.status(200).json({ 
+            status: 'success', 
+            message: 'Logged in successfully',
+            token: authData.token,
+            data: authData.user 
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+import { verifyToken } from '../../config/jwt.config';
+
+export const getMe = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+        }
+        
+        const token = authHeader.split(' ')[1];
+        const decoded = verifyToken(token);
+        
+        const userId = decoded?.id;
+        const role = decoded?.role;
+
+        if (!userId || !role) {
+            return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+        }
+
+        const profile = await authService.getMe(userId, role);
+
+        res.status(200).json({
+            status: 'success',
+            data: profile
+        });
+    } catch (error: any) {
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+             return res.status(401).json({ status: 'error', message: 'Invalid token' });
+        }
+        next(error);
+    }
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\auth\auth.routes.ts ---
+import { Router } from 'express';
+import * as authController from './auth.controller';
+import { validateRequest } from '../../middlewares/validateRequest';
+import { registerSchema, loginSchema } from './auth.validator';
+
+const router = Router();
+
+/**
+ * @route   POST /api/v1/auth/register
+ * @desc    Register a new user
+ * @access  Public
+ */
+router.post(
+    '/register', 
+    validateRequest(registerSchema), 
+    authController.register
+);
+
+/**
+ * @route   POST /api/v1/auth/login
+ * @desc    Login a user
+ * @access  Public
+ */
+router.post(
+    '/login', 
+    validateRequest(loginSchema), 
+    authController.login
+);
+
+/**
+ * @route   GET /api/v1/auth/me
+ * @desc    Get current user
+ * @access  Private
+ */
+router.get(
+    '/me',
+    authController.getMe
+);
+
+export default router;
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\auth\auth.sanitizer.ts ---
+/**
+ * Auth Sanitizer
+ * Normalizes user input to prevent data inconsistency.
+ */
+export const sanitizeAuthInput = (data: any) => {
+    return {
+        email: data.email ? data.email.toLowerCase().trim() : '',
+        password: data.password ? data.password.trim() : '',
+        role: data.role ? data.role.toLowerCase().trim() : 'student'
+    };
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\auth\auth.service.ts ---
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import { pool } from '../../config/db.config';
+import { CustomError } from '../../error/customErrors';
+import { generateToken } from '../../config/jwt.config';
+import { User } from './user.model';
+
+export const registerUser = async (userData: any): Promise<User> => {
+    const { email, password, role } = userData;
+
+    try {
+        // 1. Check if user already exists
+        const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+        
+        if (existingUser.rows.length > 0) {
+            throw new CustomError('User with this email already exists', 409);
+        }
+
+        // 2. Hash the password
+        const hashedPassword = await bcrypt.hash(password, 12);
+
+        // 3. Generate UUID
+        const id = crypto.randomUUID();
+
+        // 4. Insert user
+        const query = `
+            INSERT INTO users (id, email, password, role) 
+            VALUES ($1, $2, $3, $4) 
+            RETURNING id, email, role
+        `;
+        const result = await pool.query(query, [id, email, hashedPassword, role]);
+
+        return result.rows[0];
+    } catch (error: any) {
+        if (error instanceof CustomError) throw error;
+        console.error('Service Error [registerUser]:', error);
+        throw new CustomError('Database operation failed during registration', 500);
+    }
+};
+
+export const loginUser = async (email: string, password: string) => {
+    try {
+        // 1. Fetch user by email
+        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const user = result.rows[0];
+
+        // 2. Validate user existence
+        if (!user) {
+            throw new CustomError('Invalid email or password', 401);
+        }
+
+        // 3. Compare passwords
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
+            throw new CustomError('Invalid email or password', 401);
+        }
+
+        // 4. Generate JWT
+        const token = generateToken({ id: user.id, role: user.role });
+
+        return {
+            token,
+            user: {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                // Profile will now be fetched dynamically via /me endpoint
+            }
+        };
+    } catch (error: any) {
+        if (error instanceof CustomError) throw error;
+        
+        console.error('Service Error [loginUser]:', error);
+        throw new CustomError('Database operation failed during login', 500);
+    }
+};
+
+export const getMe = async (userId: string, role: string) => {
+    try {
+        let profile = null;
+        
+        if (role === 'admin') {
+            const instQuery = `
+                SELECT i.* FROM institutions i 
+                JOIN user_institutions ui ON i.id = ui.inst_id 
+                WHERE ui.user_id = $1
+            `;
+            const instResult = await pool.query(instQuery, [userId]);
+            profile = instResult.rows[0] || null;
+            
+        } else if (role === 'tutor') {
+            const tutorQuery = `
+                SELECT t.*, i.name as institution_name 
+                FROM tutors t 
+                JOIN user_tutors ut ON t.id = ut.tutor_id 
+                LEFT JOIN tutor_institutions ti ON t.id = ti.tutor_id
+                LEFT JOIN institutions i ON ti.inst_id = i.id
+                WHERE ut.user_id = $1
+                LIMIT 1
+            `;
+            const tutorResult = await pool.query(tutorQuery, [userId]);
+            profile = tutorResult.rows[0] || null;
+            
+        } else if (role === 'student') {
+            const studentQuery = `
+                SELECT s.*, i.name as institution_name
+                FROM students s 
+                JOIN user_students us ON s.id = us.student_id 
+                LEFT JOIN student_enrollments se ON s.id = se.student_id AND se.status = 'active'
+                LEFT JOIN institution_enrollments ie ON se.enrollment_id = ie.enrollment_id
+                LEFT JOIN institutions i ON ie.inst_id = i.id
+                WHERE us.user_id = $1
+                LIMIT 1
+            `;
+            const studentResult = await pool.query(studentQuery, [userId]);
+            profile = studentResult.rows[0] || null;
+        }
+
+        return profile;
+    } catch (error: any) {
+        if (error instanceof CustomError) throw error;
+        console.error('Service Error [getMe]:', error);
+        throw new CustomError('Failed to fetch user profile', 500);
+    }
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\auth\auth.validator.ts ---
+import { z } from 'zod';
+
+export const registerSchema = z.object({
+    body: z.object({
+        email: z.string().email({ message: "Invalid email address" }),
+        password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+        role: z.enum(['student', 'tutor', 'admin']).optional()
+    })
+});
+
+export const loginSchema = z.object({
+    body: z.object({
+        email: z.string().email({ message: "Invalid email address" }),
+        password: z.string().min(1, { message: "Password is required" })
+    })
+});
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\auth\index.ts ---
+import authRoutes from './auth.routes';
+
+export { authRoutes };
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\auth\user.model.ts ---
+/**
+ * User Model
+ * Defines the structure for the User entity.
+ */
+export interface User {
+    id: string;
+    email: string;
+    password?: string; // Hashed password, exclude from sensitive responses
+    role: 'student' | 'tutor' | 'admin';
+    createdAt?: Date;
+}
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\classModule\class\class.controller.ts ---
+import { Request, Response, NextFunction } from 'express';
+import * as classService from './class.service';
+import { verifyToken } from '../../../config/jwt.config';
+
+export const createClass = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+        }
+        const token = authHeader.split(' ')[1];
+        const decoded = verifyToken(token);
+        
+        // Frontend sends the correct inst_id from the user profile
+        const instId = req.body.inst_id;
+        
+        const classData = { ...req.body, inst_id: instId };
+
+        const newClass = await classService.createClass(classData);
+        
+        res.status(201).json({ 
+            status: 'success', 
+            message: 'Class created successfully', 
+            data: newClass 
+        });
+    } catch (error: any) {
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+             return res.status(401).json({ status: 'error', message: 'Invalid token' });
+        }
+        next(error); 
+    }
+};
+
+export const getClasses = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+        }
+        const token = authHeader.split(' ')[1];
+        const decoded = verifyToken(token);
+
+        let instId = req.query.inst_id as string;
+        if (!instId && decoded?.role === 'admin') {
+            instId = decoded.id;
+        }
+
+        if (!instId) {
+            return res.status(400).json({ status: 'error', message: 'Institution ID required' });
+        }
+
+        const classes = await classService.getClassesByInstitution(instId);
+
+        res.status(200).json({ status: 'success', data: classes });
+    } catch (error: any) {
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+             return res.status(401).json({ status: 'error', message: 'Invalid token' });
+        }
+        next(error); 
+    }
+};
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\classModule\class\class.model.ts ---
+export interface ClassEntity {
+    id: string;
+    inst_id?: string;
+    grade: string;
+    department?: string;
+    section?: string;
+    floor?: string;
+    created_at?: Date;
+    updated_at?: Date;
+}
+
+export interface CreateClassDTO {
+    inst_id?: string;
+    grade: string;
+    department?: string;
+    section?: string;
+    floor?: string;
+}
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\classModule\class\class.routes.ts ---
+import { Router } from 'express';
+import * as classController from './class.controller';
+
+const router = Router();
+
+router.post('/', classController.createClass);
+router.get('/', classController.getClasses);
+
+export default router;
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\classModule\class\class.service.ts ---
+import crypto from 'crypto';
+import { pool } from '../../../config/db.config';
+import { CustomError } from '../../../error/customErrors';
+import { CreateClassDTO, ClassEntity } from './class.model';
+
+export const createClass = async (classData: CreateClassDTO): Promise<ClassEntity> => {
+    const id = crypto.randomUUID();
+    const { inst_id, grade, department, section, floor } = classData;
+
+    const query = `
+        INSERT INTO classes (
+            id, inst_id, grade, department, section, floor
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *
+    `;
+
+    const values = [
+        id, 
+        inst_id || null, 
+        grade, 
+        department || null, 
+        section || null, 
+        floor || null
+    ];
+
+    try {
+        const result = await pool.query(query, values);
+        return result.rows[0];
+    } catch (error: any) {
+        console.error('Service Error [createClass]:', error);
+        throw new CustomError('Database operation failed during class creation', 500);
+    }
+};
+
+export const getClassesByInstitution = async (instId: string): Promise<ClassEntity[]> => {
+    const query = `
+        SELECT *
+        FROM classes
+        WHERE inst_id = $1
+        ORDER BY created_at DESC
+    `;
+    
+    try {
+        const result = await pool.query(query, [instId]);
+        return result.rows;
+    } catch (error: any) {
+        console.error('Service Error [getClassesByInstitution]:', error);
+        throw new CustomError('Failed to fetch classes', 500);
+    }
+};
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\email\email.controller.ts ---
+import { Request, Response } from 'express';
+import { sendEmail } from './email.service';
+
+/**
+ * Controller to handle sending a test email from the frontend testing page.
+ */
+export const testSendEmail = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { to, subject, text, html, institutionName, institutionEmail } = req.body;
+
+        // Basic validation
+        if (!to || !subject) {
+            res.status(400).json({ 
+                success: false, 
+                message: 'Recipient (to) and subject are required fields.' 
+            });
+            return;
+        }
+
+        // Construct dynamic text to include institution details if provided
+        const baseText = text || 'This is a test email.';
+        const dynamicText = institutionName && institutionEmail 
+            ? `${baseText}\n\nYou were invited by ${institutionName}. Contact them directly at ${institutionEmail}.` 
+            : baseText;
+
+        // Construct dynamic HTML to include institution details if provided
+        const baseHtml = html || `<p>${baseText}</p>`;
+        const dynamicHtml = institutionName && institutionEmail
+            ? `${baseHtml}<br><br><p style="color: #555; font-size: 14px;"><em>You were invited by <strong>${institutionName}</strong>. Contact them directly at <a href="mailto:${institutionEmail}">${institutionEmail}</a>.</em></p>`
+            : baseHtml;
+
+        // Trigger the shared email service
+        await sendEmail({
+            to,
+            subject,
+            text: dynamicText,
+            html: dynamicHtml,
+            fromName: institutionName,
+            replyTo: institutionEmail
+        });
+
+        res.status(200).json({ 
+            success: true, 
+            message: 'Email dispatched successfully.' 
+        });
+
+    } catch (error: any) {
+        console.error('[TestEmailController] Error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: error.message || 'Internal server error while sending email.' 
+        });
+    }
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\email\email.routes.ts ---
+    import { Router } from 'express';
+    import { testSendEmail } from './email.controller';
+
+const router = Router();
+
+/**
+ * @route   post /api/v1/test-email
+ * @desc    Send a test email
+ * @access  Public or Private
+ */
+
+router.post('/', testSendEmail);
+
+export default router;
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\email\email.service.ts ---
+import nodemailer from 'nodemailer';
+
+export interface EmailPayload {
+    to: string | string[];
+    subject: string;
+    text?: string;
+    html?: string;
+    fromName?: string;
+    replyTo?: string;
+}
+
+/**
+ * Reusable transporter configured for Gmail.
+ * Ensure EMAIL_USER and EMAIL_APP_PASSWORD are set in your server/.env file.
+ */
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_APP_PASSWORD,
+    },
+});
+
+/**
+ * Core utility function to send emails across the Tutors Portal application.
+ * 
+ * @param {EmailPayload} payload - The email details (to, subject, text, html, fromName, replyTo)
+ * @returns {Promise<boolean>} Resolves to true if successful
+ */
+export const sendEmail = async (payload: EmailPayload): Promise<boolean> => {
+    try {
+        // Validate environment variables early to prevent silent failures
+        if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
+            throw new Error('Email credentials are not configured in the environment variables.');
+        }
+
+        // Default to Tutors Portal if no institution name is provided
+        const senderName = payload.fromName ? payload.fromName : 'Tutors Portal';
+        // Default to the master email if no reply-to is provided
+        const replyToAddress = payload.replyTo ? payload.replyTo : process.env.EMAIL_USER;
+
+        const mailOptions = {
+            from: `"${senderName}" <${process.env.EMAIL_USER}>`,
+            to: payload.to,
+            replyTo: replyToAddress,
+            subject: payload.subject,
+            text: payload.text,
+            html: payload.html,
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        
+        console.log(`[EmailService] Email sent successfully to ${payload.to}. Message ID: ${info.messageId}`);
+        return true;
+        
+    } catch (error) {
+        console.error('[EmailService] Error sending email:', error);
+        // Throwing the error allows the calling controller to handle it (e.g., return a 500 response)
+        throw new Error('Failed to send email. Please check the email service configuration.');
+    }
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\email\index.ts ---
+import emailRoutes from './email.routes';
+
+export { emailRoutes };
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\enrollmentModule\enrollment\enrollment.controller.ts ---
+import { Request, Response, NextFunction } from 'express';
+import * as enrollmentService from './enrollment.service';
+import { sanitizeEnrollment } from './enrollment.sanitizer';
+
+export const create = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const sanitizedData = sanitizeEnrollment(req.body);
+        const enrollment = await enrollmentService.createEnrollment(sanitizedData);
+        res.status(201).json({ status: 'success', message: 'Enrollment created successfully', data: enrollment });
+    } catch (error) { next(error); }
+};
+
+export const getAll = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const enrollments = await enrollmentService.getAllEnrollments();
+        res.status(200).json({ status: 'success', data: enrollments });
+    } catch (error) { next(error); }
+};
+
+export const getOne = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const enrollment = await enrollmentService.getEnrollmentById(req.params.id);
+        res.status(200).json({ status: 'success', data: enrollment });
+    } catch (error) { next(error); }
+};
+
+export const getByStudentId = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const enrollments = await enrollmentService.getEnrollmentsByStudentId(req.params.studentId);
+        res.status(200).json({ status: 'success', data: enrollments });
+    } catch (error) { next(error); }
+};
+
+export const updateOne = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const sanitizedData = sanitizeEnrollment(req.body, true);
+        const enrollment = await enrollmentService.updateEnrollment(req.params.id, sanitizedData);
+        res.status(200).json({ status: 'success', data: enrollment });
+    } catch (error) { next(error); }
+};
+
+export const deleteOne = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        await enrollmentService.deleteEnrollment(req.params.id);
+        res.status(204).send();
+    } catch (error) { next(error); }
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\enrollmentModule\enrollment\enrollment.model.ts ---
+/**
+ * Enrollment Model
+ * Defines the structure for the Enrollment entity (Academic records).
+ */
+export interface Enrollment {
+    id: string;
+    academic_year: string;
+    grade: string;
+    department?: string | null;
+    section: string | null;
+    roll_no: string | null;
+    monthly_fee: number | null;
+    created_at?: Date;
+}
+
+/**
+ * Extended interface including relational data from junction tables
+ */
+export interface EnrollmentDetails extends Enrollment {
+    student_id: string;
+    inst_id: string;
+    status: 'active' | 'graduated' | 'transferred' | 'expelled';
+    joined_at?: Date;
+    left_at?: Date | null;
+}
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\enrollmentModule\enrollment\enrollment.routes.ts ---
+import { Router } from 'express';
+import * as controller from './enrollment.controller';
+import { validateRequest } from '../../../middlewares/validateRequest';
+import { enrollmentSchema } from './enrollment.validator';
+
+const router = Router();
+
+/**
+ * @route   GET /api/v1/enrollments
+ * @desc    Get all enrollments
+ * @access  Private
+ */
+router.get('/', controller.getAll);
+
+/**
+ * @route   GET /api/v1/enrollments/student/:studentId
+ * @desc    Get all enrollments for a specific student
+ * @access  Private
+ */
+router.get('/student/:studentId', validateRequest(enrollmentSchema.getByStudent), controller.getByStudentId);
+
+/**
+ * @route   GET /api/v1/enrollments/:id
+ * @desc    Get a single enrollment record by ID
+ * @access  Private
+ */
+router.get('/:id', validateRequest(enrollmentSchema.getOne), controller.getOne);
+
+/**
+ * @route   POST /api/v1/enrollments
+ * @desc    Create a new enrollment record for a student
+ * @access  Private
+ */
+router.post('/', validateRequest(enrollmentSchema.create), controller.create);
+
+/**
+ * @route   PATCH /api/v1/enrollments/:id
+ * @desc    Update a specific enrollment record
+ * @access  Private
+ */
+router.patch('/:id', validateRequest(enrollmentSchema.update), controller.updateOne);
+
+/**
+ * @route   DELETE /api/v1/enrollments/:id
+ * @desc    Delete an enrollment record
+ * @access  Private
+ */
+router.delete('/:id', validateRequest(enrollmentSchema.delete), controller.deleteOne);
+
+export default router;
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\enrollmentModule\enrollment\enrollment.sanitizer.ts ---
+/**
+ * Enrollment Sanitizer
+ * Normalizes inputs for academic records and relational mapping.
+ */
+export const sanitizeEnrollment = (data: any, isUpdate = false) => {
+    const sanitized: any = {};
+
+    if (data.student_id !== undefined) sanitized.student_id = data.student_id;
+    if (data.inst_id !== undefined) sanitized.inst_id = data.inst_id;
+    if (data.academic_year !== undefined) sanitized.academic_year = data.academic_year?.trim();
+    if (data.grade !== undefined) sanitized.grade = data.grade?.trim();
+    if (data.section !== undefined) sanitized.section = data.section ? data.section.trim() : null;
+    if (data.roll_no !== undefined) sanitized.roll_no = data.roll_no ? data.roll_no.trim() : null;
+    if (data.monthly_fee !== undefined) sanitized.monthly_fee = data.monthly_fee ? Number(data.monthly_fee) : null;
+    
+    if (data.status !== undefined) {
+        sanitized.status = data.status.trim();
+    } else if (!isUpdate) {
+        sanitized.status = 'active'; // Default for new records per schema
+    }
+
+    return sanitized;
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\enrollmentModule\enrollment\enrollment.service.ts ---
+import crypto from 'crypto';
+import { pool } from '../../../config/db.config';
+import { CustomError } from '../../../error/customErrors';
+import { EnrollmentDetails } from './enrollment.model';
+
+export const createEnrollment = async (enrollmentData: any): Promise<EnrollmentDetails> => {
+    const { student_id, inst_id, academic_year, grade, department, section, roll_no, monthly_fee, status } = enrollmentData;
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Check if student exists
+        const studentCheck = await client.query('SELECT id FROM students WHERE id = $1', [student_id]);
+        if (studentCheck.rows.length === 0) {
+            throw new CustomError('Student not found', 404);
+        }
+
+        // Check if institution exists
+        const instCheck = await client.query('SELECT id FROM institutions WHERE id = $1', [inst_id]);
+        if (instCheck.rows.length === 0) {
+            throw new CustomError('Institution not found', 404);
+        }
+
+        // If this is set as the active enrollment, set previous active enrollments for this student to 'transferred'
+        if (status === 'active') {
+            await client.query(
+                `UPDATE student_enrollments SET status = 'transferred', left_at = CURRENT_TIMESTAMP 
+                 WHERE student_id = $1 AND status = 'active'`,
+                [student_id]
+            );
+        }
+
+        const id = crypto.randomUUID();
+        
+        // 1. Insert into core enrollments table
+        const enrollmentQuery = `
+            INSERT INTO enrollments (id, academic_year, grade, department, section, roll_no, monthly_fee) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+        `;
+        
+        // CRITICAL FIX: The pg driver crashes if given 'undefined'. We must fallback to 'null'.
+        const enrollmentValues = [
+            id, 
+            academic_year, 
+            grade, 
+            department || null,
+            section || null, 
+            roll_no || null, 
+            monthly_fee ?? null // Use ?? to allow a fee of 0
+        ];
+        
+        const enrollmentResult = await client.query(enrollmentQuery, enrollmentValues);
+
+        // 2. Insert into student_enrollments junction
+        await client.query(
+            `INSERT INTO student_enrollments (student_id, enrollment_id, status) VALUES ($1, $2, $3)`,
+            [student_id, id, status || 'active']
+        );
+
+        // 3. Insert into institution_enrollments junction
+        await client.query(
+            `INSERT INTO institution_enrollments (inst_id, enrollment_id) VALUES ($1, $2)`,
+            [inst_id, id]
+        );
+
+        await client.query('COMMIT');
+
+        // Return combined data
+        return {
+            ...enrollmentResult.rows[0],
+            student_id,
+            inst_id,
+            status: status || 'active'
+        };
+    } catch (error: any) {
+        await client.query('ROLLBACK');
+        if (error instanceof CustomError) throw error;
+        console.error('Service Error [createEnrollment]:', error);
+        throw new CustomError('Database operation failed', 500);
+    } finally {
+        client.release();
+    }
+};
+
+export const getAllEnrollments = async (): Promise<EnrollmentDetails[]> => {
+    const query = `
+        SELECT e.*, se.student_id, se.status, se.joined_at, se.left_at, ie.inst_id
+        FROM enrollments e
+        JOIN student_enrollments se ON e.id = se.enrollment_id
+        JOIN institution_enrollments ie ON e.id = ie.enrollment_id
+        ORDER BY e.created_at DESC
+    `;
+    const result = await pool.query(query);
+    return result.rows;
+};
+
+export const getEnrollmentById = async (id: string): Promise<EnrollmentDetails> => {
+    const query = `
+        SELECT e.*, se.student_id, se.status, se.joined_at, se.left_at, ie.inst_id
+        FROM enrollments e
+        JOIN student_enrollments se ON e.id = se.enrollment_id
+        JOIN institution_enrollments ie ON e.id = ie.enrollment_id
+        WHERE e.id = $1
+    `;
+    const result = await pool.query(query, [id]);
+    if (result.rows.length === 0) throw new CustomError('Enrollment record not found', 404);
+    return result.rows[0];
+};
+
+export const getEnrollmentsByStudentId = async (studentId: string): Promise<EnrollmentDetails[]> => {
+    const query = `
+        SELECT e.*, se.student_id, se.status, se.joined_at, se.left_at, ie.inst_id
+        FROM enrollments e
+        JOIN student_enrollments se ON e.id = se.enrollment_id
+        JOIN institution_enrollments ie ON e.id = ie.enrollment_id
+        WHERE se.student_id = $1 
+        ORDER BY e.academic_year DESC
+    `;
+    const result = await pool.query(query, [studentId]);
+    return result.rows;
+};
+
+export const updateEnrollment = async (id: string, updateData: any): Promise<EnrollmentDetails> => {
+    const client = await pool.connect();
+    
+    try {
+        await client.query('BEGIN');
+
+        // Check if enrollment exists
+        const checkRecord = await client.query('SELECT id FROM enrollments WHERE id = $1', [id]);
+        if (checkRecord.rows.length === 0) throw new CustomError('Enrollment record not found', 404);
+
+        // Update Junction Table if status is provided
+        if (updateData.status) {
+            if (updateData.status === 'active') {
+                // Find student ID attached to this enrollment
+                const studentCheck = await client.query('SELECT student_id FROM student_enrollments WHERE enrollment_id = $1', [id]);
+                if (studentCheck.rows.length > 0) {
+                    const studentId = studentCheck.rows[0].student_id;
+                    // Deactivate others
+                    await client.query(
+                        `UPDATE student_enrollments SET status = 'transferred', left_at = CURRENT_TIMESTAMP 
+                         WHERE student_id = $1 AND enrollment_id != $2 AND status = 'active'`,
+                        [studentId, id]
+                    );
+                }
+            }
+            
+            // Update status of current target
+            const leftAt = updateData.status === 'active' ? null : new Date();
+            await client.query(
+                `UPDATE student_enrollments SET status = $1, left_at = $2 WHERE enrollment_id = $3`,
+                [updateData.status, leftAt, id]
+            );
+        }
+
+        // Update Core Enrollment Table
+        const coreKeys = Object.keys(updateData).filter(k => k !== 'status');
+        if (coreKeys.length > 0) {
+            // CRITICAL FIX: Convert undefined map values to null for the pg driver
+            const values = coreKeys.map(k => updateData[k] === undefined ? null : updateData[k]);
+            const setClause = coreKeys.map((key, index) => `${key} = $${index + 2}`).join(', ');
+            
+            const query = `UPDATE enrollments SET ${setClause} WHERE id = $1`;
+            await client.query(query, [id, ...values]);
+        }
+
+        await client.query('COMMIT');
+
+        // Fetch and return the updated composite record
+        return await getEnrollmentById(id);
+    } catch (error: any) {
+        await client.query('ROLLBACK');
+        if (error instanceof CustomError) throw error;
+        console.error('Service Error [updateEnrollment]:', error);
+        throw new CustomError('Database operation failed during update', 500);
+    } finally {
+        client.release();
+    }
+};
+
+export const deleteEnrollment = async (id: string): Promise<void> => {
+    // With ON DELETE CASCADE in the schema, deleting from 'enrollments'
+    // will automatically drop the linked records in 'student_enrollments' and 'institution_enrollments'
+    const result = await pool.query('DELETE FROM enrollments WHERE id = $1', [id]);
+    if (result.rowCount === 0) throw new CustomError('Enrollment record not found', 404);
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\enrollmentModule\enrollment\enrollment.validator.ts ---
+import { z } from 'zod';
+
+const idParamSchema = z.object({
+    id: z.string().uuid("Invalid ID format"),
+});
+
+const studentIdParamSchema = z.object({
+    studentId: z.string().uuid("Invalid student ID format"),
+});
+
+const statusEnum = z.enum(['active', 'graduated', 'transferred', 'expelled']);
+
+export const enrollmentSchema = {
+    create: z.object({
+        body: z.object({
+            student_id: z.string().uuid("Valid student ID is required"),
+            inst_id: z.string().uuid("Valid institution ID is required"),
+            academic_year: z.string().min(1, "Academic year is required (e.g., 2023-2024)"),
+            grade: z.string().min(1, "Grade/Class is required"),
+            section: z.string().optional().nullable(),
+            roll_no: z.string().optional().nullable(),
+            monthly_fee: z.number().nonnegative("Fee cannot be negative").optional().nullable(),
+            status: statusEnum.optional(),
+        }),
+    }),
+    update: z.object({
+        params: idParamSchema,
+        body: z.object({
+            academic_year: z.string().optional(),
+            grade: z.string().optional(),
+            section: z.string().optional().nullable(),
+            roll_no: z.string().optional().nullable(),
+            monthly_fee: z.number().nonnegative().optional().nullable(),
+            status: statusEnum.optional(),
+        }).refine((data) => Object.keys(data).length > 0, {
+            message: "At least one field must be provided for update",
+        }),
+    }),
+    delete: z.object({
+        params: idParamSchema,
+    }),
+    getOne: z.object({
+        params: idParamSchema,
+    }),
+    getByStudent: z.object({
+        params: studentIdParamSchema,
+    })
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\enrollmentModule\enrollment\index.ts ---
+import enrollmentRoutes from './enrollment.routes';
+
+export { enrollmentRoutes };
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\enrollmentModule\invitation\invitation.controller.ts ---
+import { Request, Response, NextFunction } from 'express';
+import * as invitationService from './invitation.service';
+
+export const send = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const invitation = await invitationService.sendInvitation(req.body);
+        
+        res.status(201).json({ 
+            status: 'success', 
+            message: 'Invitation sent successfully', 
+            data: {
+                id: invitation.id,
+                email: invitation.email,
+                expires_at: invitation.expires_at,
+                status: invitation.status
+            } 
+        });
+    } catch (error) { 
+        next(error); 
+    }
+};
+
+export const verifyInvitation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { code, user_id } = req.body;
+        const result = await invitationService.verifyInvitation(code, user_id);
+        res.status(200).json({
+            status: 'success',
+            message: 'Invitation verified successfully',
+            data: result
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getPendingInvitations = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { email } = req.params;
+        const result = await invitationService.getPendingInvitations(email);
+        res.status(200).json({
+            status: 'success',
+            data: result
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const rejectInvitation = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { id, email } = req.body;
+        await invitationService.rejectInvitation(id, email);
+        res.status(200).json({
+            status: 'success',
+            message: 'Invitation rejected successfully'
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\enrollmentModule\invitation\invitation.model.ts ---
+export interface Invitation {
+    id: string;
+    inst_id: string;
+    email: string;
+    code: string;
+    expires_at: Date;
+    status: 'pending' | 'accepted' | 'expired';
+    role?: 'student' | 'tutor';
+    academic_year?: string | null;
+    grade?: string | null;
+    section?: string | null;
+    roll_no?: string | null;
+    monthly_fee?: number | null;
+    created_at?: Date;
+}
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\enrollmentModule\invitation\invitation.routes.ts ---
+import { Router } from 'express';
+import * as invitationController from './invitation.controller';
+import { validateRequest } from '../../../middlewares/validateRequest';
+import { invitationSchema } from './invitation.validator';
+
+const router = Router();
+
+/**
+ * @route   POST /api/v1/invitations/send
+ * @desc    Generate and send an email invitation with a 6-digit code
+ * @access  Private (Institution Admin)
+ */
+router.post(
+    '/send', 
+    validateRequest(invitationSchema.send), 
+    invitationController.send
+);
+
+/**
+ * @route   POST /api/v1/invitations/verify
+ * @desc    Verify a 6-digit code and create an enrollment
+ * @access  Private (Student)
+ */
+router.post(
+    '/verify', 
+    validateRequest(invitationSchema.verify), 
+    invitationController.verifyInvitation
+);
+
+router.get('/pending/:email', validateRequest(invitationSchema.pending), invitationController.getPendingInvitations);
+router.post('/reject', validateRequest(invitationSchema.reject), invitationController.rejectInvitation);
+
+export default router;
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\enrollmentModule\invitation\invitation.service.ts ---
+import crypto from 'crypto';
+import { pool } from '../../../config/db.config';
+import { CustomError } from '../../../error/customErrors';
+import { sendEmail } from '../../email/email.service';
+import { createEnrollment } from '../enrollment/enrollment.service';
+import { Invitation } from './invitation.model';
+
+const getExpiryDate = (option: string): Date => {
+    const now = new Date();
+    switch (option) {
+        case '10m': return new Date(now.getTime() + 10 * 60000);
+        case '1h': return new Date(now.getTime() + 60 * 60000);
+        case '24h': return new Date(now.getTime() + 24 * 60 * 60000);
+        case '7d': return new Date(now.getTime() + 7 * 24 * 60 * 60000);
+        default: return new Date(now.getTime() + 24 * 60 * 60000); // Default 24h
+    }
+};
+
+const generateCode = (): string => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+export const sendInvitation = async (data: any): Promise<Invitation> => {
+    const { inst_id, email, role, academic_year, grade, section, expiry_option, roll_no, monthly_fee } = data;
+    const assignedRole = role || 'student';
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Check if institution exists
+        const instRes = await client.query('SELECT name, email FROM institutions WHERE id = $1', [inst_id]);
+        if (instRes.rows.length === 0) {
+            throw new CustomError('Institution not found', 404);
+        }
+        const institution = instRes.rows[0];
+
+        const id = crypto.randomUUID();
+        const code = generateCode();
+        const expires_at = getExpiryDate(expiry_option);
+
+        const query = `
+            INSERT INTO invitations (
+                id, inst_id, email, code, expires_at, role, academic_year, grade, section, roll_no, monthly_fee
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *
+        `;
+        const values = [id, inst_id, email, code, expires_at, assignedRole, academic_year || null, grade || null, section || null, roll_no || null, monthly_fee || null];
+        
+        const result = await client.query(query, values);
+        const invitation = result.rows[0];
+
+        // Send email based on role
+        let emailText = '';
+        let emailHtml = '';
+
+        if (assignedRole === 'tutor') {
+            emailText = `Hello,\n\nYou have been invited by ${institution.name} to join their portal as a Tutor.\n\nYour invitation code is: ${code}\n\nThis code will expire on ${expires_at.toLocaleString()}.\n\nPlease log in to your tutor account and enter this code to join the institution.\n\nBest regards,\nTutors Portal`;
+            emailHtml = `
+                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                    <h2>Institution Tutor Invitation</h2>
+                    <p>Hello,</p>
+                    <p>You have been invited by <strong>${institution.name}</strong> to join their portal as a Tutor.</p>
+                    <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; letter-spacing: 5px; font-weight: bold; border-radius: 5px; margin: 20px 0;">
+                        ${code}
+                    </div>
+                    <p style="color: #666; font-size: 14px;">This code will expire on: ${expires_at.toLocaleString()}</p>
+                    <p>Please log in to your tutor account and enter this code to join the institution.</p>
+                    <br/>
+                    <p>Best regards,<br/>Tutors Portal</p>
+                </div>
+            `;
+        } else {
+            emailText = `Hello,\n\nYou have been invited by ${institution.name} to enroll in ${grade} for the academic year ${academic_year}.\n\nYour invitation code is: ${code}\n\nThis code will expire on ${expires_at.toLocaleString()}.\n\nPlease log in to your account and enter this code to complete your enrollment.\n\nBest regards,\nTutors Portal`;
+            emailHtml = `
+                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                    <h2>Institution Enrollment Invitation</h2>
+                    <p>Hello,</p>
+                    <p>You have been invited by <strong>${institution.name}</strong> to enroll in <strong>${grade}</strong> for the academic year <strong>${academic_year}</strong>.</p>
+                    <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; letter-spacing: 5px; font-weight: bold; border-radius: 5px; margin: 20px 0;">
+                        ${code}
+                    </div>
+                    <p style="color: #666; font-size: 14px;">This code will expire on: ${expires_at.toLocaleString()}</p>
+                    <p>Please log in to your account and enter this code to complete your enrollment.</p>
+                    <br/>
+                    <p>Best regards,<br/>Tutors Portal</p>
+                </div>
+            `;
+        }
+
+        await sendEmail({
+            to: email,
+            subject: assignedRole === 'tutor' ? `Tutor Invitation from ${institution.name}` : `Enrollment Invitation from ${institution.name}`,
+            text: emailText,
+            html: emailHtml,
+            fromName: institution.name,
+            replyTo: institution.email
+        });
+
+        await client.query('COMMIT');
+        return invitation;
+    } catch (error: any) {
+        await client.query('ROLLBACK');
+        if (error instanceof CustomError) throw error;
+        console.error('Service Error [sendInvitation]:', error);
+        throw new CustomError('Failed to send invitation', 500);
+    } finally {
+        client.release();
+    }
+};
+
+export const verifyInvitation = async (code: string, user_id: string): Promise<any> => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Find invitation
+        const invRes = await client.query('SELECT * FROM invitations WHERE code = $1', [code]);
+        if (invRes.rows.length === 0) {
+            throw new CustomError('Invalid invitation code', 400);
+        }
+        const invitation = invRes.rows[0];
+
+        if (invitation.status !== 'pending') {
+            throw new CustomError(`This invitation has already been ${invitation.status}`, 400);
+        }
+
+        if (new Date() > new Date(invitation.expires_at)) {
+            await client.query('UPDATE invitations SET status = $1 WHERE id = $2', ['expired', invitation.id]);
+            await client.query('COMMIT');
+            throw new CustomError('This invitation code has expired', 400);
+        }
+
+        let resultData = null;
+
+        if (invitation.role === 'tutor') {
+            // Tutor verification
+            const tutorRes = await client.query('SELECT email FROM tutors WHERE id = $1', [user_id]);
+            if (tutorRes.rows.length === 0) {
+                throw new CustomError('Tutor profile not found', 404);
+            }
+            const tutorEmail = tutorRes.rows[0].email;
+
+            if (tutorEmail.toLowerCase() !== invitation.email.toLowerCase()) {
+                throw new CustomError('This invitation was sent to a different email address', 403);
+            }
+
+            // Check if already linked
+            const checkLink = await client.query(
+                'SELECT * FROM tutor_institutions WHERE tutor_id = $1 AND inst_id = $2',
+                [user_id, invitation.inst_id]
+            );
+            
+            if (checkLink.rows.length === 0) {
+                // Link tutor to institution
+                await client.query(
+                    'INSERT INTO tutor_institutions (tutor_id, inst_id) VALUES ($1, $2)',
+                    [user_id, invitation.inst_id]
+                );
+            }
+            resultData = { linked: true, role: 'tutor' };
+        } else {
+            // Student verification
+            const studentRes = await client.query('SELECT email FROM students WHERE id = $1', [user_id]);
+            if (studentRes.rows.length === 0) {
+                throw new CustomError('Student profile not found', 404);
+            }
+            const studentEmail = studentRes.rows[0].email;
+
+            if (studentEmail.toLowerCase() !== invitation.email.toLowerCase()) {
+                throw new CustomError('This invitation was sent to a different email address', 403);
+            }
+
+            // Create the enrollment
+            const enrollmentData = {
+                student_id: user_id,
+                inst_id: invitation.inst_id,
+                academic_year: invitation.academic_year,
+                grade: invitation.grade,
+                section: invitation.section,
+                roll_no: invitation.roll_no,
+                monthly_fee: invitation.monthly_fee,
+                status: 'active'
+            };
+
+            resultData = await createEnrollment(enrollmentData);
+        }
+
+        // Mark invitation as accepted
+        await client.query('UPDATE invitations SET status = $1 WHERE id = $2', ['accepted', invitation.id]);
+
+        await client.query('COMMIT');
+        return resultData;
+    } catch (error: any) {
+        await client.query('ROLLBACK');
+        if (error instanceof CustomError) throw error;
+        console.error('Service Error [verifyInvitation]:', error);
+        throw new CustomError('Failed to verify invitation', 500);
+    } finally {
+        client.release();
+    }
+};
+
+export const getPendingInvitations = async (email: string): Promise<any[]> => {
+    const query = `
+        SELECT i.id, i.inst_id, i.email, i.expires_at, i.status, i.role, i.academic_year, i.grade, inst.name as institution_name
+        FROM invitations i
+        JOIN institutions inst ON i.inst_id = inst.id
+        WHERE i.email = $1 AND i.status = 'pending'
+    `;
+    try {
+        const result = await pool.query(query, [email]);
+        return result.rows;
+    } catch (error) {
+        console.error('Service Error [getPendingInvitations]:', error);
+        throw new CustomError('Failed to fetch invitations', 500);
+    }
+};
+
+export const rejectInvitation = async (id: string, email: string): Promise<void> => {
+    const query = `
+        UPDATE invitations 
+        SET status = 'rejected' 
+        WHERE id = $1 AND email = $2 AND status = 'pending'
+    `;
+    try {
+        const result = await pool.query(query, [id, email]);
+        if (result.rowCount === 0) {
+            throw new CustomError('Invitation not found or already processed', 404);
+        }
+    } catch (error: any) {
+        if (error instanceof CustomError) throw error;
+        console.error('Service Error [rejectInvitation]:', error);
+        throw new CustomError('Failed to reject invitation', 500);
+    }
+};
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\enrollmentModule\invitation\invitation.validator.ts ---
+import { z } from 'zod';
+
+export const invitationSchema = {
+    send: z.object({
+        body: z.object({
+            inst_id: z.string().uuid("Valid institution ID is required"),
+            email: z.string().email("Invalid email format"),
+            role: z.enum(['student', 'tutor']).default('student'),
+            academic_year: z.string().optional().nullable(),
+            grade: z.string().optional().nullable(),
+            section: z.string().optional().nullable(),
+            roll_no: z.string().optional().nullable(),
+            monthly_fee: z.number().nonnegative().optional().nullable(),
+            expiry_option: z.enum(['10m', '1h', '24h', '7d']).default('24h')
+        }).superRefine((data, ctx) => {
+            if (data.role === 'student') {
+                if (!data.academic_year) {
+                    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Academic year is required for students", path: ['academic_year'] });
+                }
+                if (!data.grade) {
+                    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Grade is required for students", path: ['grade'] });
+                }
+            }
+        }),
+    }),
+    verify: z.object({
+        body: z.object({
+            code: z.string().length(6, "Code must be exactly 6 characters"),
+            user_id: z.string().uuid("User ID is required"),
+        }),
+    }),
+    pending: z.object({
+        params: z.object({
+            email: z.string().email("Invalid email format"),
+        }),
+    }),
+    reject: z.object({
+        body: z.object({
+            id: z.string().uuid("Invalid invitation ID"),
+            email: z.string().email("Invalid email format"),
+        }),
+    }),
+};
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\examModule\exam\exam.controller.ts ---
+import { Request, Response, NextFunction } from 'express';
+import * as examService from './exam.service';
+import { verifyToken } from '../../../config/jwt.config';
+
+export const createExam = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+        }
+        const token = authHeader.split(' ')[1];
+        const decoded = verifyToken(token);
+        const creatorId = decoded?.id;
+        
+        if (!creatorId) {
+            return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+        }
+
+        const exam = await examService.createExam(creatorId, req.body);
+        
+        res.status(201).json({ 
+            status: 'success', 
+            message: 'Exam created successfully', 
+            data: exam 
+        });
+    } catch (error: any) {
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+             return res.status(401).json({ status: 'error', message: 'Invalid token' });
+        }
+        next(error); 
+    }
+};
+
+export const getExams = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+        }
+        const token = authHeader.split(' ')[1];
+        const decoded = verifyToken(token);
+        const userId = decoded?.id;
+        
+        if (!userId) {
+            return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+        }
+
+        const instId = req.query.inst_id as string;
+
+        let exams;
+
+        if (instId) {
+            exams = await examService.getExamsByInstitution(instId);
+        } else {
+            exams = await examService.getExamsByCreator(userId);
+        }
+
+        res.status(200).json({ status: 'success', data: exams });
+    } catch (error: any) {
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+             return res.status(401).json({ status: 'error', message: 'Invalid token' });
+        }
+        next(error); 
+    }
+};
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\examModule\exam\exam.model.ts ---
+export interface Exam {
+    id: string;
+    creator_id: string;
+    inst_id?: string;
+    name: string;
+    subject: string;
+    exam_date: string;
+    exam_time: string;
+    grade: string;
+    section?: string;
+    duration_minutes: number;
+    total_marks: number;
+    created_at?: Date;
+    updated_at?: Date;
+}
+
+export interface CreateExamDTO {
+    inst_id?: string;
+    name: string;
+    subject: string;
+    exam_date: string;
+    exam_time: string;
+    grade: string;
+    section?: string;
+    duration_minutes: number;
+    total_marks: number;
+}
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\examModule\exam\exam.routes.ts ---
+import { Router } from 'express';
+import * as examController from './exam.controller';
+
+const router = Router();
+
+router.post('/', examController.createExam);
+router.get('/', examController.getExams);
+
+export default router;
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\examModule\exam\exam.service.ts ---
+import crypto from 'crypto';
+import { pool } from '../../../config/db.config';
+import { CustomError } from '../../../error/customErrors';
+import { CreateExamDTO, Exam } from './exam.model';
+
+export const createExam = async (creatorId: string, examData: CreateExamDTO): Promise<Exam> => {
+    const id = crypto.randomUUID();
+    const { inst_id, name, subject, exam_date, exam_time, grade, section, duration_minutes, total_marks } = examData;
+
+    const query = `
+        INSERT INTO exams (
+            id, creator_id, inst_id, name, subject, exam_date, exam_time, grade, section, duration_minutes, total_marks
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING *
+    `;
+
+    // Ensure undefined is converted to null for pg driver
+    const values = [
+        id, 
+        creatorId, 
+        inst_id || null, 
+        name, 
+        subject, 
+        exam_date, 
+        exam_time, 
+        grade, 
+        section || null, 
+        duration_minutes, 
+        total_marks
+    ];
+
+    try {
+        const result = await pool.query(query, values);
+        return result.rows[0];
+    } catch (error: any) {
+        console.error('Service Error [createExam]:', error);
+        throw new CustomError('Database operation failed during exam creation', 500);
+    }
+};
+
+export const getExamsByCreator = async (creatorId: string): Promise<Exam[]> => {
+    const query = `
+        SELECT e.*, i.name as institution_name
+        FROM exams e
+        LEFT JOIN institutions i ON e.inst_id = i.id
+        WHERE e.creator_id = $1
+        ORDER BY e.created_at DESC
+    `;
+    
+    try {
+        const result = await pool.query(query, [creatorId]);
+        return result.rows;
+    } catch (error: any) {
+        console.error('Service Error [getExamsByCreator]:', error);
+        throw new CustomError('Failed to fetch exams', 500);
+    }
+};
+
+export const getExamsByInstitution = async (instId: string): Promise<Exam[]> => {
+    const query = `
+        SELECT e.*, i.name as institution_name
+        FROM exams e
+        LEFT JOIN institutions i ON e.inst_id = i.id
+        WHERE e.inst_id = $1
+        ORDER BY e.created_at DESC
+    `;
+    
+    try {
+        const result = await pool.query(query, [instId]);
+        return result.rows;
+    } catch (error: any) {
+        console.error('Service Error [getExamsByInstitution]:', error);
+        throw new CustomError('Failed to fetch institution exams', 500);
+    }
+};
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\institutionModule\institution\index.ts ---
+import institutionRoutes from './institution.routes';
+
+export { institutionRoutes };
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\institutionModule\institution\institution.controller.ts ---
+import { Request, Response, NextFunction } from 'express';
+import * as institutionService from './institution.service';
+import { sanitizeInstitution } from './institution.sanitizer';
+
+export const create = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const sanitizedData = sanitizeInstitution(req.body);
+        const institution = await institutionService.createInstitution(sanitizedData);
+        res.status(201).json({ status: 'success', message: 'Institution created successfully', data: institution });
+    } catch (error) { 
+        next(error); 
+    }
+};
+
+export const getAll = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const institutions = await institutionService.getAllInstitutions();
+        res.status(200).json({ status: 'success', data: institutions });
+    } catch (error) { 
+        next(error); 
+    }
+};
+
+export const getOne = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const institution = await institutionService.getInstitutionById(req.params.id);
+        res.status(200).json({ status: 'success', data: institution });
+    } catch (error) { 
+        next(error); 
+    }
+};
+
+export const updateOne = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const sanitizedData = sanitizeInstitution(req.body);
+        
+        const institution = await institutionService.updateInstitution(req.params.id, sanitizedData);
+        res.status(200).json({ status: 'success', data: institution });
+    } catch (error) { 
+        next(error); 
+    }
+};
+
+export const deleteOne = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        await institutionService.deleteInstitution(req.params.id);
+        res.status(204).send();
+    } catch (error) { 
+        next(error); 
+    }
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\institutionModule\institution\institution.model.ts ---
+/**
+ * Institution Model
+ * Defines the structure for the Institution entity.
+ */
+export interface Institution {
+    id: string;
+    name: string;
+    email: string;
+    phone_number: string;
+    address: string | null;
+    logo_url: string | null;
+    created_at?: Date;
+}
+
+/**
+ * Extended interface for creation payload involving junction tables
+ */
+export interface InstitutionCreationPayload extends Institution {
+    user_id: string;
+}
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\institutionModule\institution\institution.routes.ts ---
+import { Router } from 'express';
+import * as controller from './institution.controller';
+import { validateRequest } from '../../../middlewares/validateRequest';
+import { institutionSchema } from './institution.validator';
+
+const router = Router();
+
+/**
+ * @route   GET /api/v1/institutions
+ * @desc    Get all institutions
+ * @access  Private
+ */
+router.get('/', controller.getAll);
+
+/**
+ * @route   GET /api/v1/institutions/:id
+ * @desc    Get a single institution by ID
+ * @access  Private
+ */
+router.get('/:id', validateRequest(institutionSchema.getOne), controller.getOne);
+
+/**
+ * @route   POST /api/v1/institutions
+ * @desc    Create a new institution
+ * @access  Private
+ */
+router.post('/', validateRequest(institutionSchema.create), controller.create);
+
+/**
+ * @route   PATCH /api/v1/institutions/:id
+ * @desc    Update a specific institution
+ * @access  Private
+ */
+router.patch('/:id', validateRequest(institutionSchema.update), controller.updateOne);
+
+/**
+ * @route   DELETE /api/v1/institutions/:id
+ * @desc    Delete an institution
+ * @access  Private
+ */
+router.delete('/:id', validateRequest(institutionSchema.delete), controller.deleteOne);
+
+export default router;
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\institutionModule\institution\institution.sanitizer.ts ---
+/**
+ * Institution Sanitizer
+ * Normalizes inputs and ensures only provided fields are returned.
+ */
+export const sanitizeInstitution = (data: any) => {
+    const sanitized: Record<string, any> = {};
+
+    if (data.name !== undefined) sanitized.name = data.name.trim();
+    if (data.email !== undefined) sanitized.email = data.email.toLowerCase().trim();
+    if (data.phone_number !== undefined) sanitized.phone_number = data.phone_number.trim();
+    
+    // Address and logo_url are nullable
+    if (data.address !== undefined) sanitized.address = data.address ? data.address.trim() : null;
+    if (data.logo_url !== undefined) sanitized.logo_url = data.logo_url ? data.logo_url.trim() : null;
+    
+    // Extract user_id for junction mapping on creation
+    if (data.user_id !== undefined) sanitized.user_id = data.user_id;
+
+    return sanitized;
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\institutionModule\institution\institution.service.ts ---
+import crypto from 'crypto';
+import { pool } from '../../../config/db.config';
+import { CustomError } from '../../../error/customErrors';
+import { Institution, InstitutionCreationPayload } from './institution.model';
+
+export const createInstitution = async (institutionData: any): Promise<InstitutionCreationPayload> => {
+    const { name, email, phone_number, address, logo_url, user_id } = institutionData;
+    
+    if (!user_id) {
+        throw new CustomError('User ID is required to link the institution', 400);
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        // Check if user exists
+        const userCheck = await client.query('SELECT id FROM users WHERE id = $1', [user_id]);
+        if (userCheck.rows.length === 0) {
+            throw new CustomError('User not found', 404);
+        }
+
+        // Check unique email constraint
+        const emailCheck = await client.query('SELECT id FROM institutions WHERE email = $1', [email]);
+        if (emailCheck.rows.length > 0) {
+            throw new CustomError('Institution with this email already exists', 409);
+        }
+
+        const id = crypto.randomUUID();
+        
+        // 1. Insert into core institutions table
+        const instQuery = `
+            INSERT INTO institutions (
+                id, name, email, phone_number, address, logo_url
+            ) VALUES ($1, $2, $3, $4, $5, $6) 
+            RETURNING *
+        `;
+        const instValues = [id, name, email, phone_number, address, logo_url];
+        const instResult = await client.query(instQuery, instValues);
+
+        // 2. Insert into user_institutions junction table
+        await client.query(
+            `INSERT INTO user_institutions (user_id, inst_id) VALUES ($1, $2)`,
+            [user_id, id]
+        );
+
+        await client.query('COMMIT');
+
+        return {
+            ...instResult.rows[0],
+            user_id
+        };
+    } catch (error: any) {
+        await client.query('ROLLBACK');
+        if (error instanceof CustomError) throw error;
+        console.error('Service Error [createInstitution]:', error);
+        throw new CustomError('Database operation failed', 500);
+    } finally {
+        client.release();
+    }
+};
+
+export const getAllInstitutions = async (): Promise<Institution[]> => {
+    const result = await pool.query('SELECT * FROM institutions ORDER BY created_at DESC');
+    return result.rows;
+};
+
+export const getInstitutionById = async (id: string): Promise<Institution> => {
+    const result = await pool.query('SELECT * FROM institutions WHERE id = $1', [id]);
+    if (result.rows.length === 0) throw new CustomError('Institution not found', 404);
+    return result.rows[0];
+};
+
+export const updateInstitution = async (id: string, updateData: Partial<Institution>): Promise<Institution> => {
+    const keys = Object.keys(updateData);
+    
+    if (keys.length === 0) {
+        throw new CustomError('No valid fields provided for update', 400);
+    }
+
+    const values = Object.values(updateData);
+    const setClause = keys.map((key, index) => `${key} = $${index + 2}`).join(', ');
+
+    const query = `UPDATE institutions SET ${setClause} WHERE id = $1 RETURNING *`;
+    
+    try {
+        const result = await pool.query(query, [id, ...values]);
+        if (result.rows.length === 0) throw new CustomError('Institution not found', 404);
+        return result.rows[0];
+    } catch (error: any) {
+        if (error.code === '23505') { // Postgres unique violation code
+            throw new CustomError('Institution with this email already exists', 409);
+        }
+        console.error('Service Error [updateInstitution]:', error);
+        throw new CustomError('Database operation failed during update', 500);
+    }
+};
+
+export const deleteInstitution = async (id: string): Promise<void> => {
+    // Note: Due to ON DELETE CASCADE on user_institutions, tutor_institutions, 
+    // and institution_enrollments, deleting the core record handles relations automatically.
+    const result = await pool.query('DELETE FROM institutions WHERE id = $1', [id]);
+    if (result.rowCount === 0) throw new CustomError('Institution not found', 404);
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\institutionModule\institution\institution.validator.ts ---
+import { z } from 'zod';
+
+const idParamSchema = z.object({
+    id: z.string().uuid("Invalid institution ID format"),
+});
+
+export const institutionSchema = {
+    create: z.object({
+        body: z.object({
+            name: z.string().min(1, "Name is required"),
+            email: z.string().email("Invalid email format"),
+            phone_number: z.string().min(10, "Valid phone number is required"),
+            address: z.string().optional().nullable(),
+            logo_url: z.string().url("Invalid URL format").optional().nullable(),
+            user_id: z.string().uuid("Invalid user ID format"), 
+        }),
+    }),
+    update: z.object({
+        params: idParamSchema,
+        body: z.object({
+            name: z.string().optional(),
+            email: z.string().email().optional(),
+            phone_number: z.string().optional(),
+            address: z.string().optional().nullable(),
+            logo_url: z.string().url().optional().nullable(),
+        }).refine((data) => Object.keys(data).length > 0, {
+            message: "At least one field must be provided for update",
+        }),
+    }),
+    delete: z.object({
+        params: idParamSchema,
+    }),
+    getOne: z.object({
+        params: idParamSchema,
+    }),
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\routineModule\routine\routine.controller.ts ---
+import { Request, Response, NextFunction } from 'express';
+import * as routineService from './routine.service';
+import { verifyToken } from '../../../config/jwt.config';
+
+const getInstId = (req: Request): string | null => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+    try {
+        const token = authHeader.split(' ')[1];
+        verifyToken(token); // Just to verify it's valid
+        // Frontend sends the correct inst_id from the user profile
+        return req.body.inst_id || (req.query.inst_id as string);
+    } catch (e) {
+        return null;
+    }
+};
+
+export const setupPeriods = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const instId = getInstId(req);
+        if (!instId) return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+
+        const periods = await routineService.setupPeriods(instId, req.body.periods);
+        res.status(201).json({ status: 'success', data: periods });
+    } catch (error) { next(error); }
+};
+
+export const getPeriods = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const instId = getInstId(req);
+        if (!instId) return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+
+        const periods = await routineService.getPeriods(instId);
+        res.status(200).json({ status: 'success', data: periods });
+    } catch (error) { next(error); }
+};
+
+export const saveSlot = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const instId = getInstId(req);
+        if (!instId) return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+
+        const slotData = { ...req.body, inst_id: instId };
+        const slot = await routineService.saveSlot(instId, slotData);
+        res.status(200).json({ status: 'success', data: slot });
+    } catch (error) { next(error); }
+};
+
+export const getRoutine = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const instId = getInstId(req);
+        if (!instId) return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+
+        const dayOfWeek = req.query.day_of_week as string;
+        const routine = await routineService.getRoutine(instId, dayOfWeek);
+        res.status(200).json({ status: 'success', data: routine });
+    } catch (error) { next(error); }
+};
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\routineModule\routine\routine.model.ts ---
+export interface RoutinePeriod {
+    id: string;
+    inst_id: string;
+    period_number: number;
+    start_time: string;
+    end_time: string;
+}
+
+export interface RoutineSlot {
+    id: string;
+    inst_id: string;
+    day_of_week: string;
+    class_id: string;
+    period_id: string;
+    subject?: string;
+    tutor_id?: string;
+    first_name?: string; // from tutor join
+    last_name?: string;  // from tutor join
+}
+
+export interface SetupPeriodsDTO {
+    inst_id: string;
+    periods: {
+        period_number: number;
+        start_time: string;
+        end_time: string;
+    }[];
+}
+
+export interface SaveSlotDTO {
+    inst_id: string;
+    day_of_week: string;
+    class_id: string;
+    period_id: string;
+    subject?: string;
+    tutor_id?: string;
+}
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\routineModule\routine\routine.routes.ts ---
+import { Router } from 'express';
+import * as routineController from './routine.controller';
+
+const router = Router();
+
+router.post('/periods', routineController.setupPeriods);
+router.get('/periods', routineController.getPeriods);
+router.post('/slots', routineController.saveSlot);
+router.get('/slots', routineController.getRoutine);
+
+export default router;
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\routineModule\routine\routine.service.ts ---
+import crypto from 'crypto';
+import { pool } from '../../../config/db.config';
+import { CustomError } from '../../../error/customErrors';
+
+export const setupPeriods = async (instId: string, periods: any[]) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        // Delete old periods (will cascade delete routine_slots)
+        await client.query('DELETE FROM routine_periods WHERE inst_id = $1', [instId]);
+        
+        for (const p of periods) {
+            const id = crypto.randomUUID();
+            await client.query(
+                `INSERT INTO routine_periods (id, inst_id, period_number, start_time, end_time) 
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [id, instId, p.period_number, p.start_time, p.end_time]
+            );
+        }
+        
+        await client.query('COMMIT');
+        return getPeriods(instId);
+    } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error('setupPeriods err', err);
+        throw new CustomError('Failed to setup periods', 500);
+    } finally {
+        client.release();
+    }
+};
+
+export const getPeriods = async (instId: string) => {
+    const result = await pool.query('SELECT * FROM routine_periods WHERE inst_id = $1 ORDER BY period_number ASC', [instId]);
+    return result.rows;
+};
+
+export const saveSlot = async (instId: string, slotData: any) => {
+    const { day_of_week, class_id, period_id, subject, tutor_id } = slotData;
+    
+    // Check if slot exists
+    const existing = await pool.query(
+        `SELECT id FROM routine_slots WHERE inst_id = $1 AND day_of_week = $2 AND class_id = $3 AND period_id = $4`,
+        [instId, day_of_week, class_id, period_id]
+    );
+
+    let id;
+    if (existing.rows.length > 0) {
+        id = existing.rows[0].id;
+        await pool.query(
+            `UPDATE routine_slots SET subject = $1, tutor_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+            [subject || null, tutor_id || null, id]
+        );
+    } else {
+        id = crypto.randomUUID();
+        await pool.query(
+            `INSERT INTO routine_slots (id, inst_id, day_of_week, class_id, period_id, subject, tutor_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [id, instId, day_of_week, class_id, period_id, subject || null, tutor_id || null]
+        );
+    }
+
+    const result = await pool.query(`SELECT rs.*, t.first_name, t.last_name FROM routine_slots rs LEFT JOIN tutors t ON rs.tutor_id = t.id WHERE rs.id = $1`, [id]);
+    return result.rows[0];
+};
+
+export const getRoutine = async (instId: string, dayOfWeek: string) => {
+    const result = await pool.query(
+        `SELECT rs.*, t.first_name, t.last_name 
+         FROM routine_slots rs 
+         LEFT JOIN tutors t ON rs.tutor_id = t.id 
+         WHERE rs.inst_id = $1 AND rs.day_of_week = $2`,
+        [instId, dayOfWeek]
+    );
+    return result.rows;
+};
+
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\studentModule\student\index.ts ---
+import studentRoutes from './student.routes';
+
+export { studentRoutes };
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\studentModule\student\student.controller.ts ---
+import { Request, Response, NextFunction } from 'express';
+import * as studentService from './student.service';
+import { sanitizeStudent } from './student.sanitizer';
+import { verifyToken } from '../../../config/jwt.config';
+import { pool } from '../../../config/db.config';
+export const create = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const sanitizedData = sanitizeStudent(req.body);
+        const student = await studentService.createStudent(sanitizedData);
+        
+        res.status(201).json({ 
+            status: 'success', 
+            message: 'Student profile created successfully', 
+            data: student 
+        });
+    } catch (error) { 
+        next(error); 
+    }
+};
+
+export const getAll = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+        }
+        const token = authHeader.split(' ')[1];
+        const decoded = verifyToken(token);
+
+        let instId = req.query.inst_id as string;
+        if (!instId && decoded?.role === 'admin') {
+            const instQuery = await pool.query('SELECT inst_id FROM user_institutions WHERE user_id = $1', [decoded.id]);
+            if (instQuery.rows.length > 0) {
+                instId = instQuery.rows[0].inst_id;
+            }
+        }
+
+        if (!instId) {
+            return res.status(400).json({ status: 'error', message: 'Institution ID required' });
+        }
+
+        const students = await studentService.getAllStudents(instId);
+        res.status(200).json({ status: 'success', data: students });
+    } catch (error: any) { 
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+             return res.status(401).json({ status: 'error', message: 'Invalid token' });
+        }
+        next(error); 
+    }
+};
+
+export const getOne = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const student = await studentService.getStudentById(req.params.id);
+        res.status(200).json({ status: 'success', data: student });
+    } catch (error) { 
+        next(error); 
+    }
+};
+
+export const updateOne = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const sanitizedData = sanitizeStudent(req.body, true);
+        const student = await studentService.updateStudent(req.params.id, sanitizedData);
+        res.status(200).json({ status: 'success', message: 'Student updated successfully', data: student });
+    } catch (error) { 
+        next(error); 
+    }
+};
+
+export const deleteOne = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        await studentService.deleteStudent(req.params.id);
+        res.status(204).send();
+    } catch (error) { 
+        next(error); 
+    }
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\studentModule\student\student.model.ts ---
+/**
+ * Student Model
+ * Defines the structure for the Student entity.
+ */
+export interface Student {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email?: string | null;
+    phone_number?: string | null;
+    address?: string | null;
+    date_of_birth?: string | null;
+    gender?: string | null;
+    guardian_name?: string | null;
+    guardian_phone?: string | null;
+    created_at?: Date;
+    updated_at?: Date;
+}
+
+/**
+ * Extended interface including relational data from junction tables
+ */
+export interface StudentDetails extends Student {
+    user_id?: string;
+}
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\studentModule\student\student.routes.ts ---
+import { Router } from 'express';
+import * as studentController from './student.controller';
+import { validateRequest } from '../../../middlewares/validateRequest';
+import { studentSchema } from './student.validator';
+
+const router = Router();
+
+/**
+ * @route   GET /api/v1/students
+ * @desc    Get all students
+ * @access  Public or Private
+ */
+router.get('/', studentController.getAll);
+
+/**
+ * @route   GET /api/v1/students/:id
+ * @desc    Get a single student by ID
+ * @access  Public or Private
+ */
+router.get(
+    '/:id', 
+    validateRequest(studentSchema.getOne), 
+    studentController.getOne
+);
+
+/**
+ * @route   POST /api/v1/students
+ * @desc    Create a new student profile and link to a user
+ * @access  Private
+ */
+router.post(
+    '/', 
+    validateRequest(studentSchema.create), 
+    studentController.create
+);
+
+/**
+ * @route   PATCH /api/v1/students/:id
+ * @desc    Update a specific student profile
+ * @access  Private
+ */
+router.patch(
+    '/:id', 
+    validateRequest(studentSchema.update), 
+    studentController.updateOne
+);
+
+/**
+ * @route   DELETE /api/v1/students/:id
+ * @desc    Delete a student profile
+ * @access  Private
+ */
+router.delete(
+    '/:id', 
+    validateRequest(studentSchema.delete), 
+    studentController.deleteOne
+);
+
+export default router;
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\studentModule\student\student.sanitizer.ts ---
+/**
+ * Student Sanitizer
+ * Normalizes inputs and ensures only provided fields are mapped.
+ */
+export const sanitizeStudent = (data: any, isUpdate = false) => {
+    const sanitized: any = {};
+
+    if (data.user_id !== undefined && !isUpdate) sanitized.user_id = data.user_id;
+
+    if (data.first_name !== undefined) sanitized.first_name = data.first_name?.trim();
+    if (data.last_name !== undefined) sanitized.last_name = data.last_name?.trim();
+    
+    if (data.email !== undefined) sanitized.email = data.email ? data.email.trim().toLowerCase() : null;
+    if (data.phone_number !== undefined) sanitized.phone_number = data.phone_number ? data.phone_number.trim() : null;
+    if (data.address !== undefined) sanitized.address = data.address ? data.address.trim() : null;
+    if (data.date_of_birth !== undefined) sanitized.date_of_birth = data.date_of_birth ? data.date_of_birth.trim() : null;
+    if (data.gender !== undefined) sanitized.gender = data.gender ? data.gender.trim() : null;
+    if (data.guardian_name !== undefined) sanitized.guardian_name = data.guardian_name ? data.guardian_name.trim() : null;
+    if (data.guardian_phone !== undefined) sanitized.guardian_phone = data.guardian_phone ? data.guardian_phone.trim() : null;
+
+    return sanitized;
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\studentModule\student\student.service.ts ---
+import crypto from 'crypto';
+import { pool } from '../../../config/db.config';
+import { CustomError } from '../../../error/customErrors';
+import { Student, StudentDetails } from './student.model';
+
+export const createStudent = async (studentData: any): Promise<StudentDetails> => {
+    const { 
+        user_id,
+        first_name, 
+        last_name, 
+        email, 
+        phone_number, 
+        address, 
+        date_of_birth, 
+        gender, 
+        guardian_name, 
+        guardian_phone 
+    } = studentData;
+
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        // 1. Check if user already has a student profile linked
+        if (user_id) {
+            const checkLinkQuery = 'SELECT student_id FROM user_students WHERE user_id = $1';
+            const existingLink = await client.query(checkLinkQuery, [user_id]);
+            
+            if (existingLink.rows.length > 0) {
+                throw new CustomError('This user is already linked to a student profile', 409);
+            }
+        }
+
+        // 2. Check for duplicate email if provided
+        if (email) {
+            const emailCheck = await client.query('SELECT id FROM students WHERE email = $1', [email]);
+            if (emailCheck.rows.length > 0) {
+                throw new CustomError('Student with this email already exists', 409);
+            }
+        }
+
+        const id = crypto.randomUUID();
+
+        // 3. Insert into core students table
+        const insertStudentQuery = `
+            INSERT INTO students (
+                id, first_name, last_name, email, phone_number, address, date_of_birth, gender, guardian_name, guardian_phone
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+            RETURNING *
+        `;
+        const studentValues = [id, first_name, last_name, email, phone_number, address, date_of_birth, gender, guardian_name, guardian_phone];
+        const studentResult = await client.query(insertStudentQuery, studentValues);
+
+        // 4. Insert into the junction table
+        if (user_id) {
+            const insertJunctionQuery = `
+                INSERT INTO user_students (user_id, student_id)
+                VALUES ($1, $2)
+                ON CONFLICT DO NOTHING
+            `;
+            await client.query(insertJunctionQuery, [user_id, id]);
+        }
+
+        await client.query('COMMIT');
+        
+        return studentResult.rows[0];
+    } catch (error: any) {
+        await client.query('ROLLBACK');
+        if (error instanceof CustomError) throw error;
+        console.error('Service Error [createStudent]:', error);
+        throw new CustomError('Database operation failed during student creation', 500);
+    } finally {
+        client.release();
+    }
+};
+
+export const getAllStudents = async (instId: string): Promise<any[]> => {
+    let query = `
+        SELECT 
+            s.*, 
+            us.user_id,
+            e.grade as grade_level,
+            e.section,
+            e.roll_no,
+            e.monthly_fee,
+            inst.name as school_name
+        FROM students s
+        LEFT JOIN user_students us ON s.id = us.student_id
+        LEFT JOIN student_enrollments se ON s.id = se.student_id AND se.status = 'active'
+        LEFT JOIN enrollments e ON se.enrollment_id = e.id
+        LEFT JOIN institution_enrollments ie ON e.id = ie.enrollment_id
+        LEFT JOIN institutions inst ON ie.inst_id = inst.id
+    `;
+    const values: any[] = [];
+    if (instId) {
+        query += ` WHERE ie.inst_id = $1`;
+        values.push(instId);
+    }
+    query += ` ORDER BY s.created_at DESC`;
+
+    const result = await pool.query(query, values);
+    return result.rows;
+};
+
+export const getStudentById = async (id: string): Promise<any> => {
+    const query = `
+        SELECT 
+            s.*, 
+            us.user_id,
+            e.grade as grade_level,
+            e.section,
+            e.roll_no,
+            e.monthly_fee,
+            inst.name as school_name
+        FROM students s
+        LEFT JOIN user_students us ON s.id = us.student_id
+        LEFT JOIN student_enrollments se ON s.id = se.student_id AND se.status = 'active'
+        LEFT JOIN enrollments e ON se.enrollment_id = e.id
+        LEFT JOIN institution_enrollments ie ON e.id = ie.enrollment_id
+        LEFT JOIN institutions inst ON ie.inst_id = inst.id
+        WHERE s.id = $1
+    `;
+    const result = await pool.query(query, [id]);
+    if (result.rows.length === 0) throw new CustomError('Student not found', 404);
+    return result.rows[0];
+};
+
+export const updateStudent = async (id: string, updateData: Partial<Student>): Promise<Student> => {
+    const keys = Object.keys(updateData);
+    if (keys.length === 0) throw new CustomError('No valid fields provided for update', 400);
+
+    const values = Object.values(updateData);
+    const setClause = keys.map((key, index) => `${key} = $${index + 2}`).join(', ');
+
+    const query = `UPDATE students SET ${setClause}, updated_at = NOW() WHERE id = $1 RETURNING *`;
+    
+    try {
+        const result = await pool.query(query, [id, ...values]);
+        if (result.rows.length === 0) throw new CustomError('Student not found', 404);
+        return result.rows[0];
+    } catch (error: any) {
+        if (error.code === '23505') { 
+            throw new CustomError('Student with this email already exists', 409);
+        }
+        console.error('Service Error [updateStudent]:', error);
+        throw new CustomError('Database operation failed during update', 500);
+    }
+};
+
+export const deleteStudent = async (id: string): Promise<void> => {
+    const result = await pool.query('DELETE FROM students WHERE id = $1', [id]);
+    if (result.rowCount === 0) throw new CustomError('Student not found', 404);
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\studentModule\student\student.validator.ts ---
+import { z } from 'zod';
+
+const idParamSchema = z.object({
+    id: z.string().uuid("Invalid student ID format"),
+});
+
+export const studentSchema = {
+    create: z.object({
+        body: z.object({
+            user_id: z.string().uuid("Valid user ID is required").optional().nullable(),
+            first_name: z.string().min(1, "First name is required"),
+            last_name: z.string().min(1, "Last name is required"),
+            email: z.string().email("Invalid email format").optional().nullable(),
+            phone_number: z.string().optional().nullable(),
+            address: z.string().optional().nullable(),
+            date_of_birth: z.string().optional().nullable(),
+            gender: z.string().optional().nullable(),
+            guardian_name: z.string().optional().nullable(),
+            guardian_phone: z.string().optional().nullable(),
+        }),
+    }),
+    update: z.object({
+        params: idParamSchema,
+        body: z.object({
+            first_name: z.string().optional(),
+            last_name: z.string().optional(),
+            email: z.string().email("Invalid email format").optional().nullable(),
+            phone_number: z.string().optional().nullable(),
+            address: z.string().optional().nullable(),
+            date_of_birth: z.string().optional().nullable(),
+            gender: z.string().optional().nullable(),
+            guardian_name: z.string().optional().nullable(),
+            guardian_phone: z.string().optional().nullable(),
+        }).refine((data) => Object.keys(data).length > 0, {
+            message: "At least one field must be provided for update",
+        }),
+    }),
+    delete: z.object({
+        params: idParamSchema,
+    }),
+    getOne: z.object({
+        params: idParamSchema,
+    }),
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\tutorModule\tutor\index.ts ---
+import tutorRoutes from './tutor.routes';
+
+export { tutorRoutes };
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\tutorModule\tutor\tutor.controller.ts ---
+import { Request, Response, NextFunction } from 'express';
+import * as tutorService from './tutor.service';
+import { sanitizeTutor } from './tutor.sanitizer';
+import { verifyToken } from '../../../config/jwt.config';
+import { pool } from '../../../config/db.config';
+export const create = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const sanitizedData = sanitizeTutor(req.body);
+        const tutor = await tutorService.createTutor(sanitizedData);
+        
+        res.status(201).json({ 
+            status: 'success', 
+            message: 'Tutor profile created successfully', 
+            data: tutor 
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getAll = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ status: 'error', message: 'Unauthorized' });
+        }
+        const token = authHeader.split(' ')[1];
+        const decoded = verifyToken(token);
+
+        let instId = req.query.inst_id as string;
+        if (!instId && decoded?.role === 'admin') {
+            const instQuery = await pool.query('SELECT inst_id FROM user_institutions WHERE user_id = $1', [decoded.id]);
+            if (instQuery.rows.length > 0) {
+                instId = instQuery.rows[0].inst_id;
+            }
+        }
+
+        if (!instId) {
+            return res.status(400).json({ status: 'error', message: 'Institution ID required' });
+        }
+
+        const tutors = await tutorService.getAllTutors(instId);
+        res.status(200).json({ status: 'success', data: tutors });
+    } catch (error: any) { 
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+             return res.status(401).json({ status: 'error', message: 'Invalid token' });
+        }
+        next(error); 
+    }
+};
+
+export const getOne = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const tutor = await tutorService.getTutorById(req.params.id);
+        res.status(200).json({ status: 'success', data: tutor });
+    } catch (error) { 
+        next(error); 
+    }
+};
+
+export const updateOne = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const sanitizedData = sanitizeTutor(req.body, true);
+        const tutor = await tutorService.updateTutor(req.params.id, sanitizedData);
+        res.status(200).json({ status: 'success', message: 'Tutor updated successfully', data: tutor });
+    } catch (error) { 
+        next(error); 
+    }
+};
+
+export const deleteOne = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        await tutorService.deleteTutor(req.params.id);
+        res.status(204).send();
+    } catch (error) { 
+        next(error); 
+    }
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\tutorModule\tutor\tutor.model.ts ---
+/**
+ * Tutor Model
+ * Defines the structure for the Tutor entity.
+ */
+export interface Tutor {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email?: string | null; // Added email
+    phone_number: string;
+    bio?: string | null;
+    hourly_rate?: number | null;
+    monthly_salary?: number | null;
+    subjects?: string[] | null;
+    is_active?: boolean;
+    created_at?: Date;
+    updated_at?: Date;
+}
+
+/**
+ * Extended interface including relational data from junction tables
+ */
+export interface TutorDetails extends Tutor {
+    inst_id?: string;
+}
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\tutorModule\tutor\tutor.routes.ts ---
+import { Router } from 'express';
+import * as tutorController from './tutor.controller';
+import { validateRequest } from '../../../middlewares/validateRequest';
+import { tutorSchema } from './tutor.validator';
+
+const router = Router();
+
+/**
+ * @route   GET /api/v1/tutors
+ * @desc    Get a list of all tutors
+ * @access  Public or Private
+ */
+router.get('/', tutorController.getAll);
+
+/**
+ * @route   GET /api/v1/tutors/:id
+ * @desc    Get a specific tutor's details by their ID
+ * @access  Public or Private
+ */
+router.get(
+    '/:id', 
+    validateRequest(tutorSchema.getOne), 
+    tutorController.getOne
+);
+
+/**
+ * @route   POST /api/v1/tutors
+ * @desc    Create a new tutor profile
+ * @access  Private
+ */
+router.post(
+    '/', 
+    validateRequest(tutorSchema.create), 
+    tutorController.create
+);
+
+/**
+ * @route   PATCH /api/v1/tutors/:id
+ * @desc    Update a specific tutor's details (including isActive status)
+ * @access  Private
+ */
+router.patch(
+    '/:id', 
+    validateRequest(tutorSchema.update), 
+    tutorController.updateOne
+);
+
+/**
+ * @route   DELETE /api/v1/tutors/:id
+ * @desc    Delete a tutor profile
+ * @access  Private
+ */
+router.delete(
+    '/:id', 
+    validateRequest(tutorSchema.delete), 
+    tutorController.deleteOne
+);
+
+export default router;
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\tutorModule\tutor\tutor.sanitizer.ts ---
+/**
+ * Tutor Sanitizer
+ * Normalizes inputs and ensures only provided fields are mapped.
+ */
+export const sanitizeTutor = (data: any, isUpdate = false) => {
+    const sanitized: any = {};
+
+    if (data.user_id !== undefined) sanitized.user_id = data.user_id;
+    if (data.user_role !== undefined) sanitized.user_role = data.user_role;
+    
+    if (data.first_name !== undefined) sanitized.first_name = data.first_name?.trim();
+    if (data.last_name !== undefined) sanitized.last_name = data.last_name?.trim();
+    
+    // Process email
+    if (data.email !== undefined) sanitized.email = data.email ? data.email.trim().toLowerCase() : null;
+    
+    if (data.phone_number !== undefined) sanitized.phone_number = data.phone_number?.trim();
+    if (data.bio !== undefined) sanitized.bio = data.bio ? data.bio.trim() : null;
+    if (data.hourly_rate !== undefined) sanitized.hourly_rate = data.hourly_rate ? Number(data.hourly_rate) : null;
+    if (data.monthly_salary !== undefined) sanitized.monthly_salary = data.monthly_salary ? Number(data.monthly_salary) : null;
+    
+    if (data.subjects !== undefined) {
+        sanitized.subjects = data.subjects ? data.subjects.map((sub: string) => sub.trim()).filter(Boolean) : null;
+    }
+
+    if (data.is_active !== undefined) {
+        sanitized.is_active = Boolean(data.is_active);
+    } else if (!isUpdate) {
+        sanitized.is_active = true; // Default to true on creation
+    }
+
+    return sanitized;
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\tutorModule\tutor\tutor.service.ts ---
+import crypto from 'crypto';
+import { pool } from '../../../config/db.config';
+import { CustomError } from '../../../error/customErrors';
+import { Tutor, TutorDetails } from './tutor.model';
+
+export const createTutor = async (tutorData: any): Promise<TutorDetails> => {
+    const { 
+        user_id, // This acts as user_id OR inst_id depending on user_role
+        user_role,
+        first_name, 
+        last_name, 
+        email, 
+        phone_number, 
+        bio, 
+        hourly_rate, 
+        monthly_salary, 
+        subjects, 
+        is_active 
+    } = tutorData;
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Check for duplicate email
+        if (email) {
+            const checkQuery = 'SELECT id FROM tutors WHERE email = $1';
+            const existing = await client.query(checkQuery, [email]);
+            if (existing.rows.length > 0) {
+                throw new CustomError('Tutor with this email already exists', 409);
+            }
+        }
+
+        const id = crypto.randomUUID();
+        
+        // 2. Insert into core tutors table 
+        const query = `
+            INSERT INTO tutors (
+                id, first_name, last_name, email, phone_number, bio, hourly_rate, monthly_salary, subjects, is_active
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+            RETURNING *
+        `;
+        const values = [id, first_name, last_name, email, phone_number, bio, hourly_rate, monthly_salary, subjects, is_active || true];
+        const result = await client.query(query, values);
+
+        // 3. Link records based on user_role
+        if (user_role === 'tutor') {
+            await client.query(
+                `INSERT INTO user_tutors (user_id, tutor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+                [user_id, id]
+            );
+        } else if (user_role === 'admin') {
+            // The user_id is treated as the inst_id
+            const instCheck = await client.query('SELECT id FROM institutions WHERE id = $1', [user_id]);
+            if (instCheck.rows.length === 0) {
+                throw new CustomError('Institution not found', 404);
+            }
+            
+            await client.query(
+                `INSERT INTO tutor_institutions (tutor_id, inst_id) VALUES ($1, $2)`,
+                [id, user_id]
+            );
+        }
+
+        await client.query('COMMIT');
+
+        return result.rows[0];
+    } catch (error: any) {
+        await client.query('ROLLBACK');
+        if (error instanceof CustomError) throw error;
+        console.error('Service Error [createTutor]:', error);
+        throw new CustomError('Database operation failed', 500);
+    } finally {
+        client.release();
+    }
+};
+
+export const linkTutorToUser = async (email: string, userId: string): Promise<boolean> => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        const tutorRes = await client.query('SELECT id FROM tutors WHERE email = $1', [email]);
+        if (tutorRes.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return false;
+        }
+
+        const tutorId = tutorRes.rows[0].id;
+
+        const query = `
+            INSERT INTO user_tutors (user_id, tutor_id) 
+            VALUES ($1, $2)
+            ON CONFLICT DO NOTHING
+        `;
+        const result = await client.query(query, [userId, tutorId]);
+        
+        await client.query('COMMIT');
+        return result.rowCount !== null && result.rowCount > 0;
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Service Error [linkTutorToUser]:', error);
+        return false;
+    } finally {
+        client.release();
+    }
+};
+
+export const getAllTutors = async (instId: string): Promise<TutorDetails[]> => {
+    let query = `
+        SELECT t.*, ti.inst_id 
+        FROM tutors t
+        LEFT JOIN tutor_institutions ti ON t.id = ti.tutor_id
+    `;
+    const values: any[] = [];
+    if (instId) {
+        query += ` WHERE ti.inst_id = $1`;
+        values.push(instId);
+    }
+    query += ` ORDER BY t.created_at DESC`;
+    
+    const result = await pool.query(query, values);
+    return result.rows;
+};
+
+export const getTutorById = async (id: string): Promise<TutorDetails> => {
+    const query = `
+        SELECT t.*, ti.inst_id 
+        FROM tutors t
+        LEFT JOIN tutor_institutions ti ON t.id = ti.tutor_id
+        WHERE t.id = $1
+    `;
+    const result = await pool.query(query, [id]);
+    if (result.rows.length === 0) throw new CustomError('Tutor not found', 404);
+    return result.rows[0];
+};
+
+export const updateTutor = async (id: string, updateData: Partial<Tutor>): Promise<Tutor> => {
+    const keys = Object.keys(updateData);
+    if (keys.length === 0) throw new CustomError('No valid fields provided for update', 400);
+
+    const values = Object.values(updateData);
+    const setClause = keys.map((key, index) => `${key} = $${index + 2}`).join(', ');
+
+    const query = `UPDATE tutors SET ${setClause}, updated_at = NOW() WHERE id = $1 RETURNING *`;
+    
+    try {
+        const result = await pool.query(query, [id, ...values]);
+        if (result.rows.length === 0) throw new CustomError('Tutor not found', 404);
+        return result.rows[0];
+    } catch (error: any) {
+        if (error.code === '23505') { 
+            throw new CustomError('Tutor with this email already exists', 409);
+        }
+        console.error('Service Error [updateTutor]:', error);
+        throw new CustomError('Database operation failed during update', 500);
+    }
+};
+
+export const deleteTutor = async (id: string): Promise<void> => {
+    const result = await pool.query('DELETE FROM tutors WHERE id = $1', [id]);
+    if (result.rowCount === 0) throw new CustomError('Tutor not found', 404);
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\feats\tutorModule\tutor\tutor.validator.ts ---
+import { z } from 'zod';
+
+const idParamSchema = z.object({
+    id: z.string().uuid("Invalid tutor ID format"),
+});
+
+export const tutorSchema = {
+    create: z.object({
+        body: z.object({
+            user_id: z.string().uuid("Valid user ID is required").optional().nullable(),
+            user_role: z.string().refine((val) => ['tutor', 'admin'].includes(val), {
+                message: "Role must be 'tutor' or 'admin'"
+            }),
+            first_name: z.string().min(1, "First name is required"),
+            last_name: z.string().min(1, "Last name is required"),
+            email: z.string().email("Invalid email format").optional().nullable(),
+            phone_number: z.string().min(10, "Valid phone number is required"),
+            bio: z.string().max(1000, "Bio is too long").optional().nullable(),
+            hourly_rate: z.number().nonnegative("Hourly rate must be a positive number").optional().nullable(),
+            monthly_salary: z.number().nonnegative("Monthly salary must be a positive number").optional().nullable(),
+            subjects: z.array(z.string()).optional().nullable(),
+            is_active: z.boolean().optional(),
+        }),
+    }),
+    update: z.object({
+        params: idParamSchema,
+        body: z.object({
+            first_name: z.string().optional(),
+            last_name: z.string().optional(),
+            email: z.string().email("Invalid email format").optional().nullable(),
+            phone_number: z.string().optional(),
+            bio: z.string().max(1000, "Bio is too long").optional().nullable(),
+            hourly_rate: z.number().nonnegative("Hourly rate must be a positive number").optional().nullable(),
+            monthly_salary: z.number().nonnegative("Monthly salary must be a positive number").optional().nullable(),
+            subjects: z.array(z.string()).optional().nullable(),
+            is_active: z.boolean().optional(),
+        }).refine((data) => Object.keys(data).length > 0, {
+            message: "At least one field must be provided for update",
+        }),
+    }),
+    delete: z.object({
+        params: idParamSchema,
+    }),
+    getOne: z.object({
+        params: idParamSchema,
+    }),
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\middlewares\errorMiddleware.ts ---
+import { Request, Response, NextFunction } from 'express';
+import { CustomError } from '../error/customErrors';
+
+export const errorHandler = (
+    err: Error | CustomError,
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    // Log the error to the terminal for debugging
+    console.error('--- Server Error ---');
+    console.error(err);
+
+    if (err instanceof CustomError) {
+        return res.status(err.statusCode).json({
+            status: 'error',
+            message: err.message
+        });
+    }
+
+    // Default 500 error for unhandled exceptions
+    res.status(500).json({
+        status: 'error',
+        message: 'An unexpected server error occurred.'
+    });
+};
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\middlewares\validateRequest.ts ---
+import { Request, Response, NextFunction } from 'express';
+import { ZodObject, ZodRawShape, ZodError } from 'zod';
+
+/**
+ * Middleware to validate request data against a Zod schema.
+ * If validation fails, it returns a 400 with a flattened error object.
+ */
+export const validateRequest = (schema: ZodObject<ZodRawShape>) => 
+    async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            await schema.parseAsync({
+                body: req.body,
+                query: req.query,
+                params: req.params,
+            });
+            return next();
+        } catch (error: any) {
+            // Check if it is a Zod validation error
+            if (error instanceof ZodError) {
+                // flatten() turns the complex Zod structure into a clean object
+                // e.g., { fieldErrors: { email: ["Invalid email"] } }
+                const formattedErrors = error.flatten().fieldErrors;
+                
+                return res.status(400).json({ 
+                    status: 'error', 
+                    message: 'Validation failed',
+                    errors: formattedErrors 
+                });
+            }
+            
+            // Pass internal/server errors to the global error handler
+            next(error);
+        }
+    };
+
+--- FILE: D:\Programming__Practices\Tutors_Portal\server\src\routes\index.ts ---
+import { Router } from 'express';
+// Example imports - you will populate these as you build features
+import authRoutes from '../feats/auth/auth.routes';
+import tutorRoutes from '../feats/tutorModule/tutor/tutor.routes';
+import studentRoutes from '../feats/studentModule/student/student.routes';
+import institutionRoutes from '../feats/institutionModule/institution/institution.routes';
+import { enrollmentRoutes } from '../feats/enrollmentModule/enrollment';
+import invitationRoutes from '../feats/enrollmentModule/invitation/invitation.routes';
+import { emailRoutes } from '../feats/email';
+import examRoutes from '../feats/examModule/exam/exam.routes';
+import classRoutes from '../feats/classModule/class/class.routes';
+import routineRoutes from '../feats/routineModule/routine/routine.routes';
+
+const router = Router();
+
+/**
+ * API Route Definition
+ * Routes are grouped by their respective feature modules
+ */
+router.use('/auth', authRoutes);
+router.use('/tutors', tutorRoutes);
+router.use('/students', studentRoutes);
+router.use('/institutions', institutionRoutes);
+router.use('/enrollments', enrollmentRoutes);
+router.use('/invitations', invitationRoutes);
+router.use('/send-emails', emailRoutes);
+router.use('/exams', examRoutes);
+router.use('/classes', classRoutes);
+router.use('/routines', routineRoutes);
+
+export default router;
