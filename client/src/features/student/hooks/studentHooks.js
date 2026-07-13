@@ -2,10 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { studentQueryKeys } from '../constants/studentQueryKeys';
 import * as studentServices from '../services/studentServices';
 
-export const useStudents = () => {
+export const useStudents = (options = {}) => {
     return useQuery({
         queryKey: studentQueryKeys.lists(),
         queryFn: studentServices.getStudents,
+        ...options,
     });
 };
 

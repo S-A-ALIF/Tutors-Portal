@@ -151,7 +151,7 @@ export const pages = [
     path: "notifications",
     component: NotificationPage,
     isProtected: true,
-    allowedRoles: ['admin', 'tutor', 'student'],
+    allowedRoles: ['admin'],
   },
   {
     path: "accept-invitation",

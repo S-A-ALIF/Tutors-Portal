@@ -1,5 +1,5 @@
     import { Router } from 'express';
-    import { testSendEmail } from './email.controller';
+    import { testSendEmail, sendBulkNotification, getMyNotifications, markNotificationAsRead } from './email.controller';
 
 const router = Router();
 
@@ -10,5 +10,8 @@ const router = Router();
  */
 
 router.post('/', testSendEmail);
+router.post('/bulk', sendBulkNotification);
+router.get('/notifications', getMyNotifications);
+router.patch('/notifications/:id/read', markNotificationAsRead);
 
 export default router;

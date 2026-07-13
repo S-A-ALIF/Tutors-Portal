@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, User, Calendar, BookOpen, CreditCard, DollarSign, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, User, Calendar, BookOpen, CreditCard, DollarSign, Settings, Bell } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useStudents } from '../../features/student/hooks/studentHooks';
 import { useTutors } from '../../features/tutor/hooks/tutorHooks';
@@ -29,14 +29,14 @@ const NavItem = ({ icon: Icon, label, path, count }) => (
 const Sidebar = () => {
   const { user } = useAuth();
   
-  // Fetch data to get counts
-  const { data: studentsData } = useStudents();
-  const { data: tutorsData } = useTutors();
+  const userRole = user?.data?.role || user?.role || 'admin';
+  
+  // Fetch data to get counts (only if admin)
+  const { data: studentsData } = useStudents({ enabled: userRole === 'admin' });
+  const { data: tutorsData } = useTutors({ enabled: userRole === 'admin' });
 
   const studentsCount = Array.isArray(studentsData) ? studentsData.length : (studentsData?.data || studentsData?.students || []).length;
   const tutorsCount = Array.isArray(tutorsData) ? tutorsData.length : (tutorsData?.data || tutorsData?.tutors || []).length;
-  
-  const userRole = user?.data?.role || user?.role || 'admin';
   
   let dashboardPath = '/dashboard';
   if (userRole === 'tutor') dashboardPath = '/tutor-dashboard';
@@ -60,6 +60,7 @@ const Sidebar = () => {
           <NavItem path="/students" label="Students" count={studentsCount} icon={Users} />
           <NavItem path="/tutors" label="Tutors" count={tutorsCount} icon={User} />
           <NavItem path="/classes" label="Classes" icon={BookOpen} />
+          <NavItem path="/notifications" label="Notify" icon={Bell} />
         </>
       )}
 

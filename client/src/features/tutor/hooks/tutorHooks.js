@@ -2,10 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tutorQueryKeys } from '../constants/tutorQueryKeys';
 import * as tutorServices from '../services/tutorServices';
 
-export const useTutors = () => {
+export const useTutors = (options = {}) => {
     return useQuery({
         queryKey: tutorQueryKeys.lists(),
         queryFn: tutorServices.getTutors,
+        ...options,
     });
 };
 

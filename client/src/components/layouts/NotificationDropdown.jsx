@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { usePendingInvitations, useRejectInvitation } from '../../features/enrollment/hooks/invitationHooks';
 import AcceptInvitationModal from '../../features/enrollment/components/AcceptInvitationModal';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import apiClient from '../../services/apiClient';
+import { Bell, MailOpen } from 'lucide-react';
 
 const NotificationDropdown = () => {
     const { user } = useAuth();
@@ -10,9 +13,34 @@ const NotificationDropdown = () => {
     const [selectedInvitation, setSelectedInvitation] = useState(null);
     const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
     const dropdownRef = useRef(null);
+    const queryClient = useQueryClient();
 
-    const { data: invitations = [], isLoading } = usePendingInvitations(email);
+    // Fetch Invitations
+    const { data: invitations = [], isLoading: loadingInvitations } = usePendingInvitations(email);
     const { mutate: rejectInvitation, isPending: isRejecting } = useRejectInvitation();
+
+    // Mutation to mark general notifications as read
+    const markAsReadMutation = useMutation({
+        mutationFn: async (id) => {
+            return apiClient.patch(`/send-emails/notifications/${id}/read`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['generalNotifications', email] });
+        }
+    });
+
+    // Fetch General Announcements from our new backend table
+    const { data: announcementsData, isLoading: loadingAnnouncements } = useQuery({
+        queryKey: ['generalNotifications', email],
+        queryFn: async () => {
+            if (!email) return [];
+            const response = await apiClient.get(`/send-emails/notifications?email=${encodeURIComponent(email)}`);
+            return response.data.data || [];
+        },
+        enabled: !!email
+    });
+    
+    const announcements = announcementsData || [];
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -37,8 +65,10 @@ const NotificationDropdown = () => {
         }
     };
 
-    // If the user doesn't have an email or is admin, maybe we still show it but it'll be empty
-    const unreadCount = invitations.length;
+    const unreadAnnouncements = announcements.filter(a => !a.is_read).length;
+    const unreadCount = invitations.length + unreadAnnouncements;
+    const isLoading = loadingInvitations || loadingAnnouncements;
+    const hasNoNotifications = invitations.length === 0 && announcements.length === 0;
 
     return (
         <div className="relative" ref={dropdownRef}>
@@ -47,10 +77,7 @@ const NotificationDropdown = () => {
                 className="w-[34px] h-[34px] rounded-[8px] bg-[#f0f0f8] flex items-center justify-center cursor-pointer border border-[rgba(60,60,120,0.10)] relative hover:bg-[#e4e4f0] transition-colors"
                 onClick={() => setIsOpen(!isOpen)}
             >
-                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                </svg>
+                <Bell className="w-[18px] h-[18px] text-gray-700" />
                 {unreadCount > 0 && (
                     <div className="w-[18px] h-[18px] bg-[#e8590c] rounded-full absolute -top-1 -right-1 border-[1.5px] border-white flex items-center justify-center text-[10px] font-bold text-white">
                         {unreadCount}
@@ -60,7 +87,7 @@ const NotificationDropdown = () => {
 
             {/* Dropdown Menu */}
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden z-50 transform origin-top-right transition-all">
+                <div className="absolute right-0 mt-2 w-80 md:w-96 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden z-50 transform origin-top-right transition-all">
                     <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
                         <h3 className="font-semibold text-gray-800 text-sm">Notifications</h3>
                         {unreadCount > 0 && (
@@ -72,25 +99,23 @@ const NotificationDropdown = () => {
                     
                     <div className="max-h-[400px] overflow-y-auto">
                         {isLoading ? (
-                            <div className="p-4 text-center text-sm text-gray-500">Loading notifications...</div>
-                        ) : invitations.length === 0 ? (
+                            <div className="p-4 text-center text-sm text-gray-500">Loading...</div>
+                        ) : hasNoNotifications ? (
                             <div className="p-6 text-center">
                                 <div className="text-gray-300 mb-2 flex justify-center">
-                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                                    </svg>
+                                    <Bell className="w-8 h-8 opacity-50" />
                                 </div>
                                 <p className="text-sm text-gray-500">No new notifications</p>
                             </div>
                         ) : (
                             <ul className="divide-y divide-gray-50">
+                                
+                                {/* Render Invitations First */}
                                 {invitations.map((inv) => (
-                                    <li key={inv.id} className="p-4 hover:bg-gray-50 transition-colors">
+                                    <li key={inv.id} className="p-4 bg-blue-50/30 hover:bg-gray-50 transition-colors">
                                         <div className="flex gap-3">
                                             <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                                </svg>
+                                                <MailOpen className="w-4 h-4" />
                                             </div>
                                             <div>
                                                 <p className="text-sm text-gray-800 leading-snug">
@@ -118,6 +143,37 @@ const NotificationDropdown = () => {
                                         </div>
                                     </li>
                                 ))}
+
+                                {/* Render General Announcements */}
+                                {announcements.map((ann) => (
+                                    <li 
+                                        key={ann.id} 
+                                        onClick={() => {
+                                            if (!ann.is_read) {
+                                                markAsReadMutation.mutate(ann.id);
+                                            }
+                                        }}
+                                        className={`p-4 transition-colors ${!ann.is_read ? 'bg-indigo-50/20 hover:bg-gray-50 cursor-pointer' : 'hover:bg-gray-50'}`}
+                                    >
+                                        <div className="flex gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                <Bell className="w-4 h-4" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-sm text-gray-800 leading-snug">
+                                                    {ann.message}
+                                                </p>
+                                                <p className="text-xs text-gray-400 mt-2">
+                                                    {new Date(ann.created_at).toLocaleString()}
+                                                </p>
+                                            </div>
+                                            {!ann.is_read && (
+                                                <div className="w-2 h-2 rounded-full bg-[#e8590c] mt-1.5 flex-shrink-0"></div>
+                                            )}
+                                        </div>
+                                    </li>
+                                ))}
+
                             </ul>
                         )}
                     </div>
