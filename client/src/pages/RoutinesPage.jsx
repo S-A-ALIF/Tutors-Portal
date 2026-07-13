@@ -10,7 +10,7 @@ const RoutinesPage = () => {
     const { user } = useAuth();
     const role = user?.role || user?.data?.role;
     const profile = user?.profile || user?.data?.profile;
-    const instId = role === 'admin' ? profile?.id : undefined;
+    const instId = role === 'admin' ? profile?.id : profile?.inst_id;
 
     const { data: periodsData, isLoading: loadingPeriods } = usePeriods(instId);
     

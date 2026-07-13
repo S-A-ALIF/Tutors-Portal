@@ -19,7 +19,6 @@ export const AuthProvider = ({ children }) => {
                     setUser(JSON.parse(storedUser));
                 }
             } catch (error) {
-                console.error("DEBUG: Failed to parse stored user during initialization:", error);
                 localStorage.removeItem('user');
             } finally {
                 setIsInitializing(false);
@@ -56,11 +55,9 @@ export const AuthProvider = ({ children }) => {
                 localStorage.setItem('user', JSON.stringify(normalizedUser));
                 return normalizedUser;
             } else {
-                console.error("DEBUG: authService.login returned undefined or null");
                 return null;
             }
         } catch (error) {
-            console.error("DEBUG: Login request error:", error);
             throw error;
         } finally {
             setLoading(false);

@@ -56,8 +56,6 @@ const InstitutionProfileForm = ({ userId, userEmail, initialData = null, onCance
                 responseData = await createInstitution(payload);
             }
 
-            console.log("DEBUG: Raw Response from API after saving:", responseData);
-
             // Extract the actual data payload (handles Axios wrapper if present)
             const profileData = responseData?.data ? responseData.data : responseData;
 

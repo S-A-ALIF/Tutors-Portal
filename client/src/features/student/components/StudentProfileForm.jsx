@@ -34,7 +34,6 @@ const StudentProfileForm = ({ userId, userEmail, initialData = null, onCancel, o
                 try {
                     formattedDate = new Date(initialData.date_of_birth).toISOString().split('T')[0];
                 } catch (e) {
-                    console.error("DEBUG: Failed to parse date_of_birth", e);
                 }
             }
 
@@ -81,8 +80,6 @@ const StudentProfileForm = ({ userId, userEmail, initialData = null, onCancel, o
                 };
                 responseData = await createStudent(payload);
             }
-
-            console.log("DEBUG: Raw Response from API after saving student profile:", responseData);
 
             // Extract the actual data payload (handles Axios wrapper if present)
             const profileData = responseData?.data ? responseData.data : responseData;

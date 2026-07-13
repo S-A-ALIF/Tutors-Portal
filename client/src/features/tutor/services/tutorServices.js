@@ -25,8 +25,6 @@ export const createTutor = async (tutorData) => {
         const response = await apiClient.post('/tutors', tutorData);
         return response.data.data;
     } catch (error) {
-        console.error("DEBUG: Error creating tutor. Payload sent from frontend:", tutorData);
-        console.error("DEBUG: Server rejected with 400. Backend response:", error.response?.data || error.message);
         throw error;
     }
 };

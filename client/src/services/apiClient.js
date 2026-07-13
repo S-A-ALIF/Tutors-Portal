@@ -32,7 +32,6 @@ apiClient.interceptors.request.use(
                 }
             }
         } catch (e) {
-            console.error("DEBUG: Failed to parse user token for request", e);
         }
         return config;
     },

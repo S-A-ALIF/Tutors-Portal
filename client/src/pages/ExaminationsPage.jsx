@@ -8,7 +8,7 @@ const ExaminationsPage = () => {
     
     const role = user?.role || user?.data?.role;
     const profile = user?.profile || user?.data?.profile;
-    const instId = role === 'admin' ? profile?.id : undefined;
+    const instId = role === 'admin' ? profile?.id : profile?.inst_id;
 
     const { data: response, isLoading, isError } = useExams(instId);
     
@@ -118,12 +118,14 @@ const ExaminationsPage = () => {
                     <h1 className="text-2xl font-bold text-gray-900">Examinations</h1>
                     <p className="text-gray-500 text-sm mt-1">View and manage all scheduled and past assessments.</p>
                 </div>
-                <Link
-                    to="/create-exam"
-                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                >
-                    + Schedule Exam
-                </Link>
+                {role === 'admin' && (
+                    <Link
+                        to="/create-exam"
+                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                        + Schedule Exam
+                    </Link>
+                )}
             </div>
 
             <div>

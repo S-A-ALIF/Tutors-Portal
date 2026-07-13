@@ -63,8 +63,6 @@ const TutorProfileForm = ({ userId, userRole,userEmail, initialData = null, onCa
                 responseData = await createTutor(payload);
             }
 
-            console.log("DEBUG: Raw Response from API after saving Tutor:", responseData);
-
             // Extract the actual data payload
             const profileData = responseData?.data ? responseData.data : responseData;
 

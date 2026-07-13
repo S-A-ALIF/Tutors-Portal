@@ -35,7 +35,7 @@ const InviteTutorModal = ({ instId, isOpen, onClose, onSuccess }) => {
     const errorMessage = error?.response?.data?.message || error?.message || null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
                 <div className="bg-green-600 px-6 py-4 flex justify-between items-center">
                     <h3 className="text-xl font-bold text-white">Invite Tutor</h3>

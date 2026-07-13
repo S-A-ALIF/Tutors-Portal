@@ -5,7 +5,6 @@ import { useAuth } from '../context/AuthContext';
 const EnrollmentPage = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
-    console.log("DEBUG: Current User Data in EnrollmentPage:", user);
 
     // Safely fallback through possible nested states from your AuthContext/Store
     const instId = user?.profile?.id;

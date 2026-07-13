@@ -91,7 +91,7 @@ export const getMe = async (userId: string, role: string) => {
             
         } else if (role === 'tutor') {
             const tutorQuery = `
-                SELECT t.*, i.name as institution_name 
+                SELECT t.*, i.name as institution_name, i.id as inst_id 
                 FROM tutors t 
                 JOIN user_tutors ut ON t.id = ut.tutor_id 
                 LEFT JOIN tutor_institutions ti ON t.id = ti.tutor_id
@@ -104,7 +104,7 @@ export const getMe = async (userId: string, role: string) => {
             
         } else if (role === 'student') {
             const studentQuery = `
-                SELECT s.*, i.name as institution_name
+                SELECT s.*, i.name as institution_name, i.id as inst_id
                 FROM students s 
                 JOIN user_students us ON s.id = us.student_id 
                 LEFT JOIN student_enrollments se ON s.id = se.student_id AND se.status = 'active'
