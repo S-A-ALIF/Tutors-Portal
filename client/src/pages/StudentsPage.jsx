@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useStudents, useDeleteStudent, useUpdateStudent, StudentCard, EditStudentModal } from '../features/student';
 import LoadingComponent from '../components/ui/LoadingComponent';
+import { Search } from 'lucide-react';
 
 const StudentsPage = () => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const { data: studentsData, isLoading, isError, error } = useStudents();
     const { mutate: deleteStudent, isLoading: isDeleting } = useDeleteStudent();
@@ -64,8 +66,16 @@ const StudentsPage = () => {
         return match ? parseInt(match[0], 10) : str;
     };
 
+    // Filter students
+    const filteredStudents = students.filter(student => {
+        const query = searchQuery.toLowerCase();
+        const fullName = `${student.first_name || ''} ${student.last_name || ''}`.toLowerCase();
+        const rollNo = (student.roll_no || '').toString().toLowerCase();
+        return fullName.includes(query) || rollNo.includes(query);
+    });
+
     // Group the students by Grade then Section
-    const groupedStudents = students.reduce((acc, student) => {
+    const groupedStudents = filteredStudents.reduce((acc, student) => {
         const grade = student.grade_level || student.class_grade || 'Unassigned Grade';
         const section = student.section || 'Unassigned Section';
         
@@ -97,9 +107,21 @@ const StudentsPage = () => {
         <div className="p-6 max-w-7xl mx-auto space-y-6 h-full">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h1 className="text-2xl font-bold text-gray-900">Students Management</h1>
+                <div className="relative w-full sm:w-72">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Search by name or roll no..."
+                        className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
             </div>
 
-            {students.length === 0 ? (
+            {filteredStudents.length === 0 ? (
                 <div className="text-center text-gray-500 py-16 bg-white rounded-xl shadow-sm border border-gray-200">
                     <p className="text-lg font-medium">No students found.</p>
                 </div>
